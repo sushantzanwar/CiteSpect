@@ -1,0 +1,126 @@
+paper_id,title,year,doi,openalex_id
+W2787225861,Artificial intelligence faces reproducibility crisis,2018,10.1126/science.359.6377.725,W2787225861
+W1901616594,"Machine learning: Trends, perspectives, and prospects",2015,10.1126/science.aaa8415,W1901616594
+W2558906498,"Object recognition using horizontal array of ultrasonic sensors",2016,10.1109/iccsp.2016.7754294,W2558906498
+W7129575785,"Household Expense Manager for Daily Utilities and Services",2025,10.1109/punecon67554.2025.11377912,W7129575785
+W4415284700,"URL under Siege: A Comparative Analysis of Malicious URL Identification with Advanced Techniques",2025,10.1109/worldsuas66815.2025.11199184,W4415284700
+W4401247924,"Hand Gesture Controlled Wheelchair Using Image Processing",2024,10.1109/isiea61920.2024.10607210,W4401247924
+W1980313076,"Immunosuppressive plasma cells impede T-cell-dependent immunogenic chemotherapy",2015,10.1038/nature14395,W1980313076
+W2919115771,"Deep learning",2015,10.1038/nature14539,W2919115771
+W4414462713,"IoT-based Smart Energy Monitoring and Forecasting using Long Short-Term Memory and Cloud Integration",2025,10.1109/icscds65426.2025.11166789,W4414462713
+W4417337275,"Enhancing IoT Device Security Using Zeroknowledge Proofs: A Privacy-Preserving Authentication Approach",2025,10.1109/iccubea65967.2025.11283660,W4417337275
+W4406262872,"Smart Waste Management System: The Integration of IoT, Blockchain, Deep Learning and AI Techniques",2024,10.1109/iconat61936.2024.10775055,W4406262872
+W4408287424,"Smart Irrigation Control System in Precision Agriculture With Jubatus Climber Algorithm Optimized Distributed BiLSTM",2025,10.1002/ird.3095,W4408287424
+W4392026534,"AgroVision: Advancing Agricultural Insights with Image-Based Deep Learning Techniques",2023,10.1109/icmnwc60182.2023.10435817,W4392026534
+W2949642792,"Crop Yield Prediction Using Deep Neural Networks",2019,10.3389/fpls.2019.00621,W2949642792
+W2969906716,"Role of Agricultural Counselling Centre in the Development of Black Rice Programme in Central Java, Indonesia",2019,10.4314/jae.v23i3.7,W2969906716
+W2995051770,"Millimeter-Level Plant Disease Detection From Aerial Photographs via Deep Learning and Crowdsourced Data",2019,10.3389/fpls.2019.01550,W2995051770
+W2996234473,"Introduction to convolutional neural network using Keras; an understanding from a statistician",2019,10.29220/csam.2019.26.6.591,W2996234473
+W3037618930,"Crop yield prediction integrating genotype and weather variables using deep learning",2021,10.1371/journal.pone.0252402,W3037618930
+W3041490948,"Predicting soil texture from smartphone-captured digital images and an application",2020,10.1016/j.geoderma.2020.114562,W3041490948
+W3063769039,"Sustainable Pest Management through Improved Advice in Agricultural Extension",2020,10.3390/su12176767,W3063769039
+W3079760979,"Crop yield prediction using machine learning: A systematic literature review",2020,10.1016/j.compag.2020.105709,W3079760979
+W3110930373,"Soil Analysis and Crop Prediction",2020,10.32628/ijsrst207433,W3110930373
+W3160835187,"Crop Recommendation on Analyzing Soil Using Machine Learning",2021,10.17762/turcomat.v12i6.4033,W3160835187
+W3195445297,"Crop Yield Prediction Using Machine Learning",2021,10.22214/ijraset.2021.37413,W3195445297
+W3197020960,"Cross Platform Development Using Flutter",2021,,W3197020960
+W4206777380,"Interpretation of Convolutional Neural Networks for Acid Sulfate Soil Classification",2022,10.3389/fenvs.2021.809995,W4206777380
+W4212763245,"A novel feature based algorithm for soil type classification",2022,10.1007/s40747-022-00682-0,W4212763245
+W4214495458,"Crop Prediction Based on Characteristics of the Agricultural Environment Using Various Feature Selection Techniques and Classifiers",2022,10.1109/access.2022.3154350,W4214495458
+W4230020968,"Crop Yield Prediction using Machine Learning",2020,10.37896/aj9.9/050,W4230020968
+W4281729686,"Machine Learning- and Feature Selection-Enabled Framework for Accurate Crop Yield Prediction",2022,10.1155/2022/6293985,W4281729686
+W4281864378,"Soil Classification and Crop Suggestion using Machine Learning Techniques",2022,10.22214/ijraset.2022.43524,W4281864378
+W4294151665,"Detection of White Leaf Disease in Sugarcane Using Machine Learning Techniques over UAV Multispectral Images",2022,10.3390/drones6090230,W4294151665
+W4310154428,"Plant Disease Diagnosis Using Deep Learning Based on Aerial Hyperspectral Images: A Review",2022,10.3390/rs14236031,W4310154428
+W4318570637,"Crop Yield Prediction using Machine Learning and Deep Learning Techniques",2023,10.1016/j.procs.2023.01.023,W4318570637
+W2600430051,"Domestic appliances energy optimization with model predictive control",2017,10.1016/j.enconman.2017.03.061,W2600430051
+W2603745210,"Predictive maintenance: strategic use of IT in manufacturing organizations",2017,10.1007/s10796-017-9749-z,W2603745210
+W2976695001,"Predictive Maintenance System for Efficiency Improvement of Heating Equipment",2019,10.1109/bigdataservice.2019.00019,W2976695001
+W2989738037,"An Energy Prediction Approach for a Nonintrusive Load Monitoring in Home Appliances",2019,10.1109/tce.2019.2956638,W2989738037
+W3004848853,"IoT-enabled smart appliances under industry 4.0: A case study",2020,10.1016/j.aei.2020.101043,W3004848853
+W3141155221,"State-of-the-Art Predictive Maintenance Techniques",2010,10.1109/tim.2010.2047662,W3141155221
+W3213232905,"Predictive Maintenance of home appliances: Focus on Washing Machines",2021,10.1109/iecon48115.2021.9589642,W3213232905
+W3215081509,"Predictive Maintenance of Industrial Equipment’s Using IOT",2021,10.1007/978-981-16-4943-1_24,W3215081509
+W4206101843,"Monitoring and Controlling of Energy Consumption using IOT-based Predictive Maintenance",2021,10.1109/smart52563.2021.9676268,W4206101843
+W4310929522,"An IoT Cloud and Big Data Architecture for the Maintenance of Home Appliances",2022,10.1109/iecon49645.2022.9968580,W4310929522
+W4362681817,"Non-Intrusive Load Monitoring and Forecasting for Home Appliances using Artificial Intelligence – A Review",2022,10.1109/smartgencon56628.2022.10084310,W4362681817
+W4381684703,"Forecasting failure rate of IoT devices: A deep learning way to predictive maintenance",2023,10.1016/j.compeleceng.2023.108829,W4381684703
+W4385624484,"Predictive Maintenance in Photovoltaic Systems Using Ensemble ML Empirical Analysis",2023,10.1109/icufn57995.2023.10199326,W4385624484
+W4399731175,"RETRACTED ARTICLE:Predictive Maintenance Optimization in Zigbee-Enabled Smart Home Networks: A Machine Learning-Driven Approach Utilizing Fault Prediction Models",2024,10.1007/s11277-024-11233-w,W4399731175
+W4401335580,"An Innovative Approach for Predictive Maintenance of Home Boilers: ECOSMART Framework",2024,10.23919/splitech61897.2024.10612463,W4401335580
+W4402356349,"Simulation of Malfunctions in Home Appliances’ Power Consumption",2024,10.3390/en17174529,W4402356349
+W4406263643,"Leveraging Big Data Analytics For Predictive Maintenance In Smart Home Appliances",2024,10.1109/icees61253.2024.10776901,W4406263643
+W4406871685,"Safeguarding IoT consumer devices: Deep learning with TinyML driven real-time anomaly detection for predictive maintenance",2025,10.1016/j.asej.2025.103281,W4406871685
+W4407215104,"IoT-Driven Predictive Maintenance for Household Energy Meters: Enhancing Reliability and Efficiency Through Real-Time Data Analytics",2024,10.1109/icces63552.2024.10859905,W4407215104
+W7084050574,"FEARLESS: Women Safety Software",2025,10.1109/icoct64433.2025.11118864,W7084050574
+W4317553414,"A Crowd-Enabled Approach for Privacy-Enhanced and Personalized Safe Route Planning for Fixed or Flexible Destinations",2023,10.1109/tkde.2023.3234703,W4317553414
+W4322577606,"NEMO-SOS- A Future Trends in Smart Accident Alert Application",2022,10.1109/icpects56089.2022.10047341,W4322577606
+W4362450542,"Save Our Ships SOS-AN Android Application for Safety",2023,10.22214/ijraset.2023.49955,W4362450542
+W4384302487,"Development of A Women Safety Smartphone Application- SAKHI",2023,10.1109/icsccc58608.2023.10176701,W4384302487
+W4410887394,"Development of a System to Monitor and Maximize Health of Lithium-Ion Batteries",2025,10.1109/icoei65986.2025.11013516,W4410887394
+W2895616024,"Extending Battery Lifetime by Avoiding High SOC",2018,10.3390/app8101825,W2895616024
+W3207457460,"Environmental impacts, pollution sources and pathways of spent lithium-ion batteries",2021,10.1039/d1ee00691f,W3207457460
+W4377287659,"Capacity Degradation and Aging Mechanisms Evolution of Lithium-Ion Batteries under Different Operation Conditions",2023,10.3390/en16104232,W4377287659
+W4385332507,"Ageing of High Energy Density Automotive Li-Ion Batteries: The Effect of Temperature and State-of-Charge",2023,10.1149/1945-7111/aceb8f,W4385332507
+W4386758389,"Cycle Aging of a Commercial Lithium-Ion Cell – A Numerical Approach",2023,10.4271/2023-28-0027,W4386758389
+W4391073912,"Real-time Lithium-ion battery state of health evaluation based on discrete wavelet transform: The effect of operating temperature",2024,10.1016/j.powera.2024.100136,W4391073912
+W4391424208,"Cycle Aging Effect on Lithium-ion Battery Resistance: a Machine Learning Approach",2023,10.1109/metroxraine58569.2023.10405749,W4391424208
+W4391639330,"Towards Zero Waste Recovery of Li-Ion Battery",2023,10.1149/ma2023-02283287mtgabs,W4391639330
+W4396710681,"Smart Battery Management System for Electric Vehicles Using IoT",2024,10.1109/icicv62344.2024.00120,W4396710681
+W4399171291,"Enhancement on IoT Based Battery Management System For Electric Vehicles",2024,10.2139/ssrn.4847692,W4399171291
+W4399204188,"State of Health (SoH) estimation methods for second life lithium-ion battery—Review and challenges",2024,10.1016/j.apenergy.2024.123542,W4399204188
+W4400831696,"A Critical Review on Key Issues of Performance Degradation Factors for Lithium-Ion Batteries",2024,10.1088/1755-1315/1375/1/012021,W4400831696
+W4405058982,"Advanced battery management system enhancement using IoT and ML for predicting remaining useful life in Li-ion batteries",2024,10.1038/s41598-024-80719-1,W4405058982
+W146900863,"Neural Information Processing Systems",2018,10.7551/mitpress/11474.003.0014,W146900863
+W170811313,"17th International Joint Conference on Artificial Intelligence 2001.",2001,,W170811313
+W407547601,"Neocognitron: A new algorithm for pattern recognition tolerant of deformations and shifts in position",1982,10.1016/0031-3203(82)90024-3,W407547601
+W1487583988,"OverFeat: Integrated Recognition, Localization and Detection using Convolutional Networks",2013,10.48550/arxiv.1312.6229,W1487583988
+W1498436455,"Learning representations by back-propagating errors",1986,10.1038/323533a0,W1498436455
+W1514535095,"Show, Attend and Tell: Neural Image Caption Generation with Visual Attention",2015,10.48550/arxiv.1502.03044,W1514535095
+W1573503290,"Beyond Regression : ""New Tools for Prediction and Analysis in the Behavioral Sciences",1974,,W1573503290
+W1752712236,"Large-Scale FPGA-Based Convolutional Networks",2011,10.1017/cbo9781139042918.020,W1752712236
+W1970689298,"Continuous space language models",2006,10.1016/j.csl.2006.09.003,W1970689298
+W1978592082,"Online particle detection with Neural Networks based on topological calorimetry information",2012,10.1088/1742-6596/368/1/012030,W1978592082
+W1993845689,"The ""Wake-Sleep"" Algorithm for Unsupervised Neural Networks",1995,10.1126/science.7761831,W1993845689
+W1993882792,"Acoustic Modeling Using Deep Belief Networks",2011,10.1109/tasl.2011.2109382,W1993882792
+W1999497791,"An analog neural network processor with programmable topology",1991,10.1109/4.104196,W1999497791
+W1999798000,"Deep Neural Nets as a Method for Quantitative Structure–Activity Relationships",2015,10.1021/ci500747n,W1999798000
+W2022508996,"Learning Hierarchical Features for Scene Labeling",2012,10.1109/tpami.2012.231,W2022508996
+W2025768430,"Extracting and composing robust features with denoising autoencoders",2008,10.1145/1390156.1390294,W2025768430
+W2064675550,"Long Short-Term Memory",1997,10.1162/neco.1997.9.8.1735,W2064675550
+W2072128103,"Learning Deep Architectures for AI",2009,10.1561/9781601982957,W2072128103
+W2074551195,"Modeling Natural Images Using Gated MRFs",2013,10.1109/tpami.2013.29,W2074551195
+W2085989895,"Preface: Cerebral Cortex Has Come of Age",1991,10.1093/cercor/1.1.1-a,W2085989895
+W2088338354,"The human splicing code reveals new insights into the genetic determinants of disease",2014,10.1126/science.1254806,W2088338354
+W2095739681,"From machine learning to machine reasoning",2013,10.1007/s10994-013-5335-x,W2095739681
+W2098580305,"Distributed Hierarchical Processing in the Primate Cerebral Cortex",1991,10.1093/cercor/1.1.1,W2098580305
+W2100495367,"Reducing the Dimensionality of Data with Neural Networks",2006,10.1126/science.1127647,W2100495367
+W2107878631,"Learning long-term dependencies with gradient descent is difficult",1994,10.1109/72.279181,W2107878631
+W2108069432,"Multi-column deep neural network for traffic sign classification",2012,10.1016/j.neunet.2012.02.023,W2108069432
+W2111304802,"On the training of recurrent neural networks",2011,10.1109/ssd.2011.5767396,W2111304802
+W2112796928,"Gradient-based learning applied to document recognition",1998,10.1109/5.726791,W2112796928
+W2116360511,"Receptive fields, binocular interaction and functional architecture in the cat's visual cortex",1962,10.1113/jphysiol.1962.sp006837,W2116360511
+W2117671523,"Phoneme recognition using time-delay neural networks",1989,10.1109/29.21701,W2117671523
+W2120284346,"Convolutional face finder: a neural architecture for fast and robust face detection",2004,10.1109/tpami.2004.97,W2120284346
+W2120432001,"Large-scale deep unsupervised learning using graphics processors",2009,10.1145/1553374.1553486,W2120432001
+W2121289914,"Connectomic reconstruction of the inner plexiform layer in the mouse retina",2013,10.1038/nature12346,W2121289914
+W2136922672,"A Fast Learning Algorithm for Deep Belief Nets",2006,10.1162/neco.2006.18.7.1527,W2136922672
+W2144015117,"Deep learning of the tissue-regulated splicing code",2014,10.1093/bioinformatics/btu277,W2144015117
+W2144354855,"Face recognition: a convolutional neural-network approach",1997,10.1109/72.554195,W2144354855
+W2145339207,"Human-level control through deep reinforcement learning",2015,10.1038/nature14236,W2145339207
+W2146989110,"Identifying and attacking the saddle point problem in high-dimensional non-convex optimization",2014,10.48550/arxiv.1406.2572,W2146989110
+W2157331557,"Learning Phrase Representations using RNN Encoder–Decoder for Statistical Machine Translation",2014,10.3115/v1/d14-1179,W2157331557
+W2158778629,"Toward automatic phenotyping of developing embryos from videos",2005,10.1109/tip.2005.852470,W2158778629
+W2160815625,"Deep Neural Networks for Acoustic Modeling in Speech Recognition: The Shared Views of Four Research Groups",2012,10.1109/msp.2012.2205597,W2160815625
+W2163922914,"Representation Learning: A Review and New Perspectives",2013,10.1109/tpami.2013.50,W2163922914
+W2166206801,"Deep Neural Networks Rival the Representation of Primate IT Cortex for Core Visual Object Recognition",2014,10.1371/journal.pcbi.1003963,W2166206801
+W2169488311,"Learning Convolutional Feature Hierarchies for Visual Recognition",2010,,W2169488311
+W2169805405,"Convolutional Networks Can Learn to Generate Affinity Graphs for Image Segmentation",2009,10.1162/neco.2009.10-08-881,W2169805405
+W2800394774,"Pattern Classification and Scene Analysis.",1974,10.2307/2344977,W2800394774
+W4232280717,"Learning long‐range vision for autonomous off‐road driving",2009,10.1002/rob.20276,W4232280717
+W4249882522,"Semantic Cognition",2004,10.7551/mitpress/6161.001.0001,W4249882522
+W2123416742,"Sentence generation from a bag of words using N-gram model",2014,10.1109/icaccct.2014.7019414,W2123416742
+W4385245566,"Exploiting Generative AI to Scale up Intelligent Tutoring Systems",2023,10.4230/lipics.itp.2023.19,W4385245566
+W2097117768,"Going deeper with convolutions",2015,10.1109/cvpr.2015.7298594,W2097117768
+W2158899491,"Natural Language Processing (almost) from Scratch",2011,10.48550/arxiv.1103.0398,W2158899491
+W2952230511,"Natural Language Processing (almost) from Scratch",2011,10.48550/arxiv.1103.0398,W2952230511

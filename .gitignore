@@ -1,0 +1,32 @@
+# Compiled C binaries and object files
+*.exe
+*.o
+*.obj
+*.out
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Environment variables and API credentials
+.env
+.env.*
+*.key
+
+# Temporary test directories and runtime temp files
+tmp_*/
+backend/tmp_*/
+openalex_response.json
+
+# Logs and backups
+*.log
+*.bak
+*.tmp
+
+# Local development and editor/agent artifacts
+.clangd
+.agents/
+.claude/
+.playwright-mcp/
+skills-lock.json

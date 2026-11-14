@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CiteSpect - Research Paper Citation Analysis System</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+  <header class="site-header">
+    <div class="container">
+      <h1>CiteSpect</h1>
+      <p class="subtitle">Research Paper Citation Analysis System</p>
+      <p class="intro">
+        Enter a paper's DOI or OpenAlex Work ID to inspect the papers it cites.
+        CiteSpect detects <strong>Self-Citations</strong> (shared OpenAlex author IDs via a C99 Hash Table with Separate
+        Chaining)
+        and <strong>Reciprocal Cross-Citations</strong> (mutual citations A &rarr; B and B &rarr; A via Adjacency-List
+        Graph traversal).
+      </p>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <section class="card" aria-labelledby="search-heading">
+      <h2 id="search-heading">Find a paper</h2>
+      <form id="search-form" novalidate>
+        <label for="doi-input">Paper DOI or OpenAlex Work ID</label>
+        <div class="form-row">
+          <input type="text" id="doi-input" name="doi" autocomplete="off"
+            placeholder="10.1038/nature14539 or W2919115771" aria-describedby="doi-hint">
+          <button type="submit" id="analyze-button">Analyze</button>
+        </div>
+        <p id="doi-hint" class="hint">Example DOI: 10.1038/nature14539 (or https://doi.org/10.1038/nature14539) or
+          cached Work ID: W2919115771.</p>
+      </form>
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+    </section>
+
+    <section id="paper-section" class="card" aria-labelledby="paper-heading" hidden>
+      <h2 id="paper-heading">Paper information</h2>
+      <dl id="paper-details" class="details"></dl>
+      <h3 id="authors-heading">Authors</h3>
+      <ul id="author-list" class="author-list"></ul>
+    </section>
+
+    <section id="analysis-section" class="card" aria-labelledby="analysis-heading" hidden>
+      <h2 id="analysis-heading">Citation analysis summary</h2>
+      <p id="analysis-message" class="status"></p>
+      <div id="summary-grid" class="summary-grid"></div>
+
+      <h3>What the categories mean</h3>
+      <dl class="definitions">
+        <dt>Self-Citation (SELF / NOT IDENTIFIED AS SELF)</dt>
+        <dd>The citing and cited papers share at least one exact OpenAlex author ID in the C99 Separate-Chaining Hash
+          Table.</dd>
+        <dt>Confirmed Reciprocal Citation (CONFIRMED RECIPROCAL)</dt>
+        <dd>Paper A cites Paper B (A &rarr; B) and Paper B's outgoing reference graph also cites Paper A (B &rarr; A).
+        </dd>
+        <dt>Not Reciprocal (NOT RECIPROCAL)</dt>
+        <dd>Paper B's outgoing reference list was retrieved and verified, and no reverse citation edge (B &rarr; A)
+          exists.</dd>
+        <dt>Reciprocal Unknown (UNKNOWN)</dt>
+        <dd>Paper B's reference metadata is unavailable or could not be fetched from OpenAlex, so reciprocity cannot be
+          verified.</dd>
+      </dl>
+      <p class="hint">
+        Self-citation is common when authors build on their own earlier work. Unmatched author lists are labeled
+        <em>Not Identified as Self</em> because missing author IDs cannot prove cross-citation.
+      </p>
+    </section>
+
+    <section id="table-section" class="card" aria-labelledby="table-heading" hidden>
+      <h2 id="table-heading">Citation details</h2>
+      <p id="table-empty" class="hint" hidden></p>
+      <div class="table-wrap">
+        <table id="citation-table">
+          <caption class="visually-hidden">Each row is one paper cited by the analyzed paper</caption>
+          <thead>
+            <tr>
+              <th scope="col">Citing paper</th>
+              <th scope="col">Cited paper</th>
+              <th scope="col">Self-citation</th>
+              <th scope="col">Reciprocal citation</th>
+              <th scope="col">Shared authors / notes</th>
+            </tr>
+          </thead>
+          <tbody id="citation-rows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="graph-section" class="card" aria-labelledby="graph-heading" hidden>
+      <h2 id="graph-heading">Citation relationships</h2>
+      <p class="hint">
+        The center is the analyzed paper. Arrows point from the citing paper toward each cited paper.
+        Click or select any cited-paper node (Tab + Enter/Space) to inspect its details.
+      </p>
+      <div class="graph-layout">
+        <div id="graph-container"></div>
+        <aside id="graph-node-panel" class="node-panel" aria-live="polite" hidden>
+          <div class="node-panel-header">
+            <h3 id="node-panel-title">Selected cited paper</h3>
+            <button type="button" id="node-panel-close" class="node-panel-close"
+              aria-label="Clear selected node">&times;</button>
+          </div>
+          <dl id="node-panel-details" class="details node-details"></dl>
+        </aside>
+      </div>
+      <ul id="graph-legend" class="legend"></ul>
+    </section>
+
+  </main>
+
+  <script src="script.js"></script>
+</body>
+
+</html>
