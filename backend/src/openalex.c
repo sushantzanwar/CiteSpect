@@ -7,6 +7,7 @@
 
 #define RESPONSE_FILE "openalex_response.json"
 #define API_BASE "https://api.openalex.org/works/"
+#define API_WORKS_LIST "https://api.openalex.org/works"
 #define API_FIELDS "?select=id,doi,title,publication_year,authorships,referenced_works"
 #define ID_FIELDS "?select=id,doi,title,publication_year,authorships,referenced_works"
 #define DOI_PREFIX "https://doi.org/"
@@ -472,6 +473,275 @@ int openalex_fetch_by_id(const char *work_id, Paper *out)
 
     snprintf(url, sizeof(url), "%s%s%s", API_BASE, work_id, ID_FIELDS);
     return fetch_url(url, "", out);
+}
+
+static int parse_nonneg_int(const char *p, int *out)
+{
+    long val = 0;
+
+    if (p == NULL || out == NULL)
+        return 0;
+    p = skip_ws(p);
+    if (!isdigit((unsigned char)*p))
+        return 0;
+    while (isdigit((unsigned char)*p)) {
+        int digit = *p - '0';
+        if (val > (1000000000L - digit) / 10L)
+            return 0;
+        val = val * 10L + digit;
+        p++;
+    }
+    if (!is_value_end(*p))
+        return 0;
+    *out = (int)val;
+    return 1;
+}
+
+static int parse_citing_results_array(const char *results,
+                                      char out_ids[][PAPER_ID_LEN],
+                                      int current_count,
+                                      int max_ids,
+                                      int *page_items_parsed,
+                                      int *truncated)
+{
+    const char *p = skip_ws(results + 1);
+    int stored = 0;
+
+    if (*p == ']')
+        return OPENALEX_OK;
+
+    while (*p != '\0') {
+        const char *item_end;
+        char id[PAPER_ID_LEN];
+
+        if (*p != '{')
+            return OPENALEX_ERR_PARSE;
+        item_end = skip_container(p);
+        if (item_end <= p || item_end[-1] != '}')
+            return OPENALEX_ERR_PARSE;
+        if (!read_id(find_key(p, "id"), id, sizeof(id)) || !is_valid_work_id(id))
+            return OPENALEX_ERR_PARSE;
+
+        (*page_items_parsed)++;
+        if (current_count + stored < max_ids) {
+            snprintf(out_ids[current_count + stored], PAPER_ID_LEN, "%s", id);
+            stored++;
+        } else {
+            *truncated = 1;
+        }
+
+        p = skip_ws(item_end);
+        if (*p == ']')
+            return OPENALEX_OK;
+        if (*p != ',')
+            return OPENALEX_ERR_PARSE;
+        p = skip_ws(p + 1);
+        if (*p == ']' || *p == '\0')
+            return OPENALEX_ERR_PARSE;
+    }
+    return OPENALEX_ERR_PARSE;
+}
+
+int openalex_parse_citing_page(const char *json,
+                               char out_ids[][PAPER_ID_LEN],
+                               int current_count,
+                               int max_ids,
+                               int *page_items_parsed,
+                               int *meta_total_count,
+                               int *truncated)
+{
+    const char *root;
+    const char *end;
+    const char *meta;
+    const char *results;
+
+    if (json == NULL || out_ids == NULL || current_count < 0 || max_ids <= 0 ||
+        page_items_parsed == NULL || meta_total_count == NULL || truncated == NULL)
+        return OPENALEX_ERR_PARSE;
+
+    *page_items_parsed = 0;
+    *meta_total_count = -1;
+    *truncated = 0;
+
+    root = skip_ws(json);
+    if (*root != '{')
+        return OPENALEX_ERR_PARSE;
+    end = skip_container(root);
+    if (end <= root || end[-1] != '}')
+        return OPENALEX_ERR_PARSE;
+
+    meta = find_key(root, "meta");
+    if (meta == NULL || *meta != '{')
+        return OPENALEX_ERR_PARSE;
+    if (!parse_nonneg_int(find_key(meta, "count"), meta_total_count))
+        return OPENALEX_ERR_PARSE;
+
+    results = find_key(root, "results");
+    if (results == NULL || *results != '[')
+        return OPENALEX_ERR_PARSE;
+
+    return parse_citing_results_array(results, out_ids, current_count, max_ids,
+                                      page_items_parsed, truncated);
+}
+
+static void reset_citer_fetch_result(CiterFetchResult *out)
+{
+    out->count = 0;
+    out->total_available = -1;
+    out->is_complete = 0;
+    out->is_truncated = 0;
+    out->api_succeeded = 0;
+}
+
+static int apply_citing_page(const char *json,
+                             int page,
+                             int limit,
+                             int per_page,
+                             int *total_seen,
+                             CiterFetchResult *out,
+                             int *result_code)
+{
+    int page_items = 0;
+    int meta_count = -1;
+    int page_trunc = 0;
+    int added;
+    int code;
+
+    code = openalex_parse_citing_page(json, out->ids, out->count, PAPER_MAX_REFS,
+                                      &page_items, &meta_count, &page_trunc);
+    if (code != OPENALEX_OK) {
+        out->api_succeeded = 0;
+        out->is_complete = 0;
+        *result_code = code;
+        return -1;
+    }
+
+    added = PAPER_MAX_REFS - out->count;
+    if (page_items < added)
+        added = page_items;
+    if (added > 0)
+        out->count += added;
+    *total_seen += page_items;
+
+    if (page == 1)
+        out->total_available = meta_count;
+    if (page_trunc)
+        out->is_truncated = 1;
+
+    if (out->total_available == 0 || *total_seen >= out->total_available) {
+        out->api_succeeded = 1;
+        out->is_complete = out->is_truncated ? 0 : 1;
+        *result_code = OPENALEX_OK;
+        return 0;
+    }
+    if (page_items == 0 || page_items < per_page ||
+        out->count >= PAPER_MAX_REFS || page == limit) {
+        out->api_succeeded = 1;
+        out->is_truncated = 1;
+        out->is_complete = 0;
+        *result_code = OPENALEX_OK;
+        return 0;
+    }
+    *result_code = OPENALEX_OK;
+    return 1;
+}
+
+int openalex_collect_citing_pages(const char *const page_jsons[],
+                                  int num_pages_provided,
+                                  int max_pages_limit,
+                                  int per_page,
+                                  CiterFetchResult *out)
+{
+    int limit;
+    int page;
+    int total_seen = 0;
+    int result_code = OPENALEX_OK;
+
+    if (out == NULL)
+        return OPENALEX_ERR_READ;
+    reset_citer_fetch_result(out);
+    if (per_page <= 0 || num_pages_provided < 0)
+        return OPENALEX_ERR_READ;
+
+    limit = (max_pages_limit > 0) ? max_pages_limit : OPENALEX_MAX_CITER_PAGES;
+    for (page = 1; page <= limit; page++) {
+        int step;
+
+        if (page > num_pages_provided || page_jsons == NULL || page_jsons[page - 1] == NULL) {
+            if (page == 1)
+                return OPENALEX_ERR_READ;
+            out->is_truncated = 1;
+            out->is_complete = 0;
+            out->api_succeeded = 1;
+            break;
+        }
+
+        step = apply_citing_page(page_jsons[page - 1], page, limit, per_page,
+                                 &total_seen, out, &result_code);
+        if (step <= 0)
+            return result_code;
+    }
+    return OPENALEX_OK;
+}
+
+int openalex_fetch_citing_ids(const char *work_id,
+                              int max_pages,
+                              CiterFetchResult *out)
+{
+    char url[URL_SIZE];
+    int limit;
+    int page;
+    int total_seen = 0;
+    int result_code = OPENALEX_OK;
+
+    if (out == NULL)
+        return OPENALEX_ERR_BAD_ID;
+    reset_citer_fetch_result(out);
+    if (!is_valid_work_id(work_id))
+        return OPENALEX_ERR_BAD_ID;
+
+    limit = (max_pages > 0) ? max_pages : OPENALEX_MAX_CITER_PAGES;
+    for (page = 1; page <= limit; page++) {
+        char *json;
+        int code;
+        int step;
+
+        if (snprintf(url, sizeof(url), "%s?filter=cites:%s&select=id&per-page=%d&page=%d",
+                     API_WORKS_LIST, work_id, OPENALEX_CITERS_PER_PAGE, page) >= (int)sizeof(url)) {
+            if (page == 1)
+                return OPENALEX_ERR_REQUEST;
+            out->is_truncated = 1;
+            out->is_complete = 0;
+            return OPENALEX_ERR_REQUEST;
+        }
+
+        code = download_work(url);
+        if (code != OPENALEX_OK) {
+            remove(RESPONSE_FILE);
+            if (page > 1) {
+                out->is_truncated = 1;
+                out->is_complete = 0;
+            }
+            return code;
+        }
+
+        json = read_file(RESPONSE_FILE);
+        remove(RESPONSE_FILE);
+        if (json == NULL) {
+            if (page > 1) {
+                out->is_truncated = 1;
+                out->is_complete = 0;
+            }
+            return OPENALEX_ERR_READ;
+        }
+
+        step = apply_citing_page(json, page, limit, OPENALEX_CITERS_PER_PAGE,
+                                 &total_seen, out, &result_code);
+        free(json);
+        if (step <= 0)
+            return result_code;
+    }
+    return OPENALEX_OK;
 }
 
 const char *openalex_error_message(int code)

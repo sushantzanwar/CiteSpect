@@ -63,6 +63,18 @@ def run_c_coupling(paper_a_id, paper_b_id):
     return result.stdout.decode("utf-8", errors="replace").splitlines()
 
 
+def run_c_cocitation(paper_a_id, paper_b_id):
+    workdir = get_workdir()
+    with c_program_lock:
+        result = subprocess.run(
+            [EXE_PATH, "--cocitation", paper_a_id, paper_b_id],
+            cwd=workdir,
+            capture_output=True,
+            timeout=180,
+        )
+    return result.stdout.decode("utf-8", errors="replace").splitlines()
+
+
 def parse_output(lines):
     data = {"authors": [], "references": [], "citation_graph": []}
     inside = False
@@ -439,6 +451,117 @@ def coupling_analysis():
         "shared_references": [
             {"id": rid, "title": local_titles.get(rid, "")}
             for rid in parsed["shared_references"]
+        ],
+    })
+
+
+def parse_cocitation(lines):
+    data = {
+        "paper_a": "",
+        "paper_b": "",
+        "status": "",
+        "data_complete": False,
+        "unique_citers_a": None,
+        "unique_citers_b": None,
+        "common_count": None,
+        "union_count": None,
+        "jaccard_similarity": None,
+        "co_citing_papers": [],
+        "error": "",
+    }
+    int_keys = {
+        "Paper A Unique Citers": "unique_citers_a",
+        "Paper B Unique Citers": "unique_citers_b",
+        "Co-Citing Papers (Common)": "common_count",
+        "Union Citers": "union_count",
+    }
+
+    for line in lines:
+        text = line.strip()
+        if text.startswith("Error:"):
+            data["error"] = text[6:].strip()
+            continue
+        if ":" not in text:
+            continue
+        label, raw_val = [part.strip() for part in text.split(":", 1)]
+        if label == "Paper A":
+            data["paper_a"] = raw_val
+        elif label == "Paper B":
+            data["paper_b"] = raw_val
+        elif label == "Co-Citation":
+            data["status"] = raw_val
+        elif label == "Citing Data Complete":
+            data["data_complete"] = raw_val == "YES"
+        elif label in int_keys:
+            try:
+                data[int_keys[label]] = int(raw_val)
+            except ValueError:
+                pass
+        elif label == "Jaccard Similarity":
+            if not raw_val.upper().startswith("N/A"):
+                try:
+                    data["jaccard_similarity"] = float(raw_val.rstrip("%").strip())
+                except ValueError:
+                    data["jaccard_similarity"] = None
+            else:
+                data["jaccard_similarity"] = None
+        elif label == "Co-Citing Paper" and raw_val:
+            data["co_citing_papers"].append(raw_val)
+
+    if not data["data_complete"]:
+        data["jaccard_similarity"] = None
+
+    return data
+
+
+@app.route("/api/cocitation", methods=["POST"])
+def cocitation_analysis():
+    body = request.get_json(silent=True) or {}
+    paper_a = str(body.get("paper_a", "")).strip().upper()
+    paper_b = str(body.get("paper_b", "")).strip().upper()
+    work_id_pattern = r"W[A-Za-z0-9_]{1,28}"
+
+    if not re.fullmatch(work_id_pattern, paper_a) or not re.fullmatch(work_id_pattern, paper_b):
+        return jsonify({
+            "success": False,
+            "error": "Two valid OpenAlex Work IDs (like W2919115771 and W1901616594) are required.",
+        }), 400
+    if paper_a == paper_b:
+        return jsonify({
+            "success": False,
+            "error": "Paper A and Paper B must have distinct OpenAlex Work IDs.",
+        }), 400
+    if not os.path.exists(EXE_PATH):
+        return jsonify({"success": False, "error": "citespect.exe not found. Compile the C project first."}), 500
+
+    try:
+        lines = run_c_cocitation(paper_a, paper_b)
+    except subprocess.TimeoutExpired:
+        return jsonify({"success": False, "error": "The co-citation comparison took too long."}), 504
+
+    parsed = parse_cocitation(lines)
+    if parsed["error"]:
+        return jsonify({"success": False, "error": parsed["error"]}), 400
+    if parsed["status"] not in ("YES", "NO", "UNKNOWN"):
+        return jsonify({"success": False, "error": "The C program returned no co-citation result."}), 502
+
+    local_titles = load_local_titles()
+    return jsonify({
+        "success": True,
+        "paper_a": parsed["paper_a"] or paper_a,
+        "paper_a_title": local_titles.get(parsed["paper_a"] or paper_a, ""),
+        "paper_b": parsed["paper_b"] or paper_b,
+        "paper_b_title": local_titles.get(parsed["paper_b"] or paper_b, ""),
+        "status": parsed["status"],
+        "data_complete": parsed["data_complete"],
+        "unique_citers_a": parsed["unique_citers_a"],
+        "unique_citers_b": parsed["unique_citers_b"],
+        "common_count": parsed["common_count"],
+        "union_count": parsed["union_count"],
+        "jaccard_similarity": parsed["jaccard_similarity"],
+        "co_citing_papers": [
+            {"id": cid, "title": local_titles.get(cid, "")}
+            for cid in parsed["co_citing_papers"]
         ],
     })
 

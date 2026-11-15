@@ -221,6 +221,136 @@ class CiteSpectFlaskTests(unittest.TestCase):
             res_mal = self.client.post("/api/coupling", json={"paper_a": "W2001", "paper_b": "W2002"})
         self.assertEqual(res_mal.status_code, 502)
 
+    def test_12_cocitation_yes_no_and_partial_data(self):
+        yes_lines = [
+            "========== CO-CITATION ANALYSIS ==========",
+            "Paper A: W2001",
+            "Paper B: W2002",
+            "Co-Citation: YES",
+            "Citing Data Complete: YES",
+            "Paper A Unique Citers: 2",
+            "Paper B Unique Citers: 2",
+            "Co-Citing Papers (Common): 1",
+            "Union Citers: 3",
+            "Jaccard Similarity: 33.33%",
+            "Co-Citing Paper: W1001",
+        ]
+        with patch.object(bridge_app, "run_c_cocitation", return_value=yes_lines):
+            res_yes = self.client.post("/api/cocitation", json={"paper_a": "W2001", "paper_b": "W2002"})
+        self.assertEqual(res_yes.status_code, 200)
+        by = res_yes.get_json()
+        self.assertTrue(by["success"])
+        self.assertEqual(by["paper_a"], "W2001")
+        self.assertEqual(by["paper_a_title"], "Cited Self Reciprocal")
+        self.assertEqual(by["paper_b"], "W2002")
+        self.assertEqual(by["paper_b_title"], "Cited Cross Reciprocal")
+        self.assertEqual(by["status"], "YES")
+        self.assertTrue(by["data_complete"])
+        self.assertEqual(by["unique_citers_a"], 2)
+        self.assertEqual(by["unique_citers_b"], 2)
+        self.assertEqual(by["common_count"], 1)
+        self.assertEqual(by["union_count"], 3)
+        self.assertEqual(by["jaccard_similarity"], 33.33)
+        self.assertEqual(by["co_citing_papers"], [{"id": "W1001", "title": "Main Synthetic Paper"}])
+
+        no_lines = [
+            "========== CO-CITATION ANALYSIS ==========",
+            "Paper A: W2001",
+            "Paper B: W2003",
+            "Co-Citation: NO",
+            "Citing Data Complete: YES",
+            "Paper A Unique Citers: 1",
+            "Paper B Unique Citers: 1",
+            "Co-Citing Papers (Common): 0",
+            "Union Citers: 2",
+            "Jaccard Similarity: 0.00%",
+        ]
+        with patch.object(bridge_app, "run_c_cocitation", return_value=no_lines):
+            res_no = self.client.post("/api/cocitation", json={"paper_a": "W2001", "paper_b": "W2003"})
+        self.assertEqual(res_no.status_code, 200)
+        bn = res_no.get_json()
+        self.assertTrue(bn["success"])
+        self.assertEqual(bn["status"], "NO")
+        self.assertTrue(bn["data_complete"])
+        self.assertEqual(bn["jaccard_similarity"], 0.0)
+        self.assertEqual(bn["co_citing_papers"], [])
+
+        partial_yes_lines = [
+            "========== CO-CITATION ANALYSIS ==========",
+            "Paper A: W2001",
+            "Paper B: W2002",
+            "Co-Citation: YES",
+            "Citing Data Complete: NO",
+            "Paper A Unique Citers: 1",
+            "Paper B Unique Citers: 1",
+            "Co-Citing Papers (Common): 1",
+            "Union Citers: 1",
+            "Jaccard Similarity: N/A (incomplete citing data)",
+            "Co-Citing Paper: W1001",
+        ]
+        with patch.object(bridge_app, "run_c_cocitation", return_value=partial_yes_lines):
+            res_partial = self.client.post("/api/cocitation", json={"paper_a": "W2001", "paper_b": "W2002"})
+        self.assertEqual(res_partial.status_code, 200)
+        bp = res_partial.get_json()
+        self.assertTrue(bp["success"])
+        self.assertEqual(bp["status"], "YES")
+        self.assertFalse(bp["data_complete"])
+        self.assertIsNone(bp["jaccard_similarity"])
+        self.assertEqual(bp["co_citing_papers"], [{"id": "W1001", "title": "Main Synthetic Paper"}])
+
+    def test_13_cocitation_unknown_identical_and_errors(self):
+        unk_lines = [
+            "========== CO-CITATION ANALYSIS ==========",
+            "Paper A: W2001",
+            "Paper B: W9999",
+            "Co-Citation: UNKNOWN",
+            "Citing Data Complete: NO",
+            "Paper A Unique Citers: 1",
+            "Paper B Unique Citers: 0",
+            "Co-Citing Papers (Common): 0",
+            "Union Citers: 1",
+            "Jaccard Similarity: N/A (incomplete citing data)",
+        ]
+        with patch.object(bridge_app, "run_c_cocitation", return_value=unk_lines):
+            res_unk = self.client.post("/api/cocitation", json={"paper_a": "W2001", "paper_b": "W9999"})
+        self.assertEqual(res_unk.status_code, 200)
+        bu = res_unk.get_json()
+        self.assertTrue(bu["success"])
+        self.assertEqual(bu["status"], "UNKNOWN")
+        self.assertFalse(bu["data_complete"])
+        self.assertIsNone(bu["jaccard_similarity"])
+
+        res_same = self.client.post("/api/cocitation", json={"paper_a": "W2001", "paper_b": "W2001"})
+        self.assertEqual(res_same.status_code, 400)
+        self.assertFalse(res_same.get_json()["success"])
+
+        res_bad = self.client.post("/api/cocitation", json={"paper_a": "BAD", "paper_b": "W2001"})
+        self.assertEqual(res_bad.status_code, 400)
+        self.assertFalse(res_bad.get_json()["success"])
+
+        with patch.object(bridge_app, "run_c_cocitation", side_effect=subprocess.TimeoutExpired("citespect", 180)):
+            res_to = self.client.post("/api/cocitation", json={"paper_a": "W2001", "paper_b": "W2002"})
+        self.assertEqual(res_to.status_code, 504)
+
+        with patch.object(bridge_app, "run_c_cocitation", return_value=["GARBAGE"]):
+            res_mal = self.client.post("/api/cocitation", json={"paper_a": "W2001", "paper_b": "W2002"})
+        self.assertEqual(res_mal.status_code, 502)
+
+    def test_14_frontend_serves_cocitation_controls(self):
+        res_html = self.client.get("/")
+        html = res_html.get_data(as_text=True)
+        res_html.close()
+        self.assertIn('id="mode-coupling"', html)
+        self.assertIn('id="mode-cocitation"', html)
+        self.assertIn('id="comparison-method-hint"', html)
+
+        res_js = self.client.get("/script.js")
+        js = res_js.get_data(as_text=True)
+        res_js.close()
+        self.assertIn("/api/cocitation", js)
+        self.assertIn("showCoCitationResult", js)
+        self.assertIn('"UNVERIFIED"', js)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

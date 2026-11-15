@@ -21,6 +21,8 @@ int csv_load_authors(const char *paper_id, Paper *out);
 
 int csv_load_citations(const char *citing_id, char cited_ids[][PAPER_ID_LEN], int max);
 
+int csv_load_citing_papers(const char *cited_id, char citing_ids[][PAPER_ID_LEN], int max);
+
 int paper_has_citations_saved(const char *paper_id);
 
 #endif

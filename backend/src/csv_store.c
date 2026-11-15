@@ -196,6 +196,46 @@ int csv_load_citations(const char *citing_id, char cited_ids[][PAPER_ID_LEN], in
     return count;
 }
 
+int csv_load_citing_papers(const char *cited_id, char citing_ids[][PAPER_ID_LEN], int max)
+{
+    char line[LINE_SIZE];
+    size_t target_len;
+    int count = 0;
+    FILE *f;
+
+    if (cited_id == NULL || citing_ids == NULL || max <= 0 || cited_id[0] == '\0')
+        return 0;
+    target_len = strlen(cited_id);
+    if (target_len >= PAPER_ID_LEN)
+        return 0;
+
+    f = fopen(CITATIONS_CSV, "r");
+    if (f == NULL)
+        return 0;
+
+    while (count < max && fgets(line, sizeof(line), f) != NULL) {
+        const char *comma = strchr(line, ',');
+        size_t citing_len;
+        const char *cited_part;
+        size_t cited_len;
+
+        if (comma == NULL)
+            continue;
+        citing_len = (size_t)(comma - line);
+        cited_part = comma + 1;
+        cited_len = strcspn(cited_part, "\r\n");
+
+        if (citing_len == 0 || citing_len >= PAPER_ID_LEN)
+            continue;
+        if (cited_len != target_len || strncmp(cited_part, cited_id, target_len) != 0)
+            continue;
+        snprintf(citing_ids[count], PAPER_ID_LEN, "%.*s", (int)citing_len, line);
+        count++;
+    }
+    fclose(f);
+    return count;
+}
+
 int paper_has_citations_saved(const char *paper_id)
 {
     char line[LINE_SIZE];

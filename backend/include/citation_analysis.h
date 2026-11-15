@@ -15,6 +15,11 @@
 #define COUPLING_NO 1
 #define COUPLING_UNKNOWN 2
 
+#define COCITATION_YES 0
+#define COCITATION_NO 1
+#define COCITATION_UNKNOWN 2
+#define COCITATION_INVALID 3
+
 typedef struct {
     int status;
     int unique_refs_a;
@@ -25,6 +30,19 @@ typedef struct {
     char common_refs[PAPER_MAX_REFS][PAPER_ID_LEN];
 } CouplingResult;
 
+typedef struct {
+    int status;
+    int citers_a_complete;
+    int citers_b_complete;
+    int exact_jaccard;
+    int unique_citers_a;
+    int unique_citers_b;
+    int common_count;
+    int union_count;
+    double jaccard_pct;
+    char co_citing_ids[PAPER_MAX_REFS][PAPER_ID_LEN];
+} CoCitationResult;
+
 int citation_check_reciprocal(const Paper *cited, const char *citing_id, int refs_available);
 
 int citation_is_duplicate(char cited_ids[][PAPER_ID_LEN], int index);
@@ -34,6 +52,18 @@ int citation_compute_coupling(const Paper *paper_a, int refs_a_available,
                               CouplingResult *out);
 
 int compare_papers_coupling(const char *paper_a_id, const char *paper_b_id);
+
+int citation_compute_cocitation(const char *paper_a_id,
+                                const char citers_a[][PAPER_ID_LEN],
+                                int count_a,
+                                int a_complete,
+                                const char *paper_b_id,
+                                const char citers_b[][PAPER_ID_LEN],
+                                int count_b,
+                                int b_complete,
+                                CoCitationResult *out);
+
+int compare_papers_cocitation(const char *paper_a_id, const char *paper_b_id);
 
 int classify_citation(const Paper *citing, const Paper *cited, int shared_index[], int *shared_count);
 

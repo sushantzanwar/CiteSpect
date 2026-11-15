@@ -1,6 +1,7 @@
 var API_ANALYZE = "/api/analyze";
 var API_ANALYSIS = "/api/citation-analysis";
 var API_COUPLING = "/api/coupling";
+var API_COCITATION = "/api/cocitation";
 var SVG_NS = "http://www.w3.org/2000/svg";
 
 var COUPLING_BADGE_INFO = {
@@ -73,7 +74,11 @@ var couplingResults = document.getElementById("coupling-results");
 var couplingSummaryGrid = document.getElementById("coupling-summary-grid");
 var couplingDetails = document.getElementById("coupling-details");
 var couplingSharedWrap = document.getElementById("coupling-shared-wrap");
+var couplingSharedHeading = document.getElementById("coupling-shared-heading");
 var couplingSharedList = document.getElementById("coupling-shared-list");
+var comparisonMethodHint = document.getElementById("comparison-method-hint");
+var modeCouplingRadio = document.getElementById("mode-coupling");
+var modeCocitationRadio = document.getElementById("mode-cocitation");
 
 var isBusy = false;
 var isCouplingBusy = false;
@@ -451,7 +456,7 @@ function drawGraph(centerId, citedPapers) {
     nodeGroup.appendChild(svgElement("circle", { cx: x, cy: y, r: dotRadius, fill: info.color, class: "graph-node-dot" }));
 
     var tip = svgElement("title", {});
-    tip.textContent = cited.id + (cited.title ? " — " + cited.title : "") + (info.text ? " (" + info.text + ")" : "");
+    tip.textContent = cited.id + (cited.title ? " (" + cited.title + ")" : "") + (info.text ? " [" + info.text + "]" : "");
     nodeGroup.appendChild(tip);
 
     if (showAllLabels) {
@@ -644,7 +649,7 @@ function makeCouplingPaperNode(id, title) {
   var wrap = document.createElement("span");
   wrap.appendChild(makeIdNode(id));
   if (title) {
-    wrap.appendChild(textNode(" — " + title));
+    wrap.appendChild(textNode(" (" + title + ")"));
   }
   return wrap;
 }
@@ -657,12 +662,31 @@ function makeCouplingBadge(status) {
   return badge;
 }
 
+function getSelectedComparisonMode() {
+  return modeCocitationRadio && modeCocitationRadio.checked ? "cocitation" : "coupling";
+}
+
+function updateComparisonMethodHint() {
+  if (!comparisonMethodHint) {
+    return;
+  }
+  if (getSelectedComparisonMode() === "cocitation") {
+    comparisonMethodHint.textContent =
+      "Two distinct papers are co-cited when one or more third-party papers cite both of them (C \u2192 A and C \u2192 B). Exact Jaccard similarity is shown only when complete OpenAlex citing sets are verified.";
+  } else {
+    comparisonMethodHint.textContent =
+      "Two papers are bibliographically coupled when they cite one or more common references (A \u2192 R and B \u2192 R). Jaccard similarity measures reference overlap, not research quality.";
+  }
+  couplingResults.hidden = true;
+  showStatus(couplingStatus, "", "");
+}
+
 function showCouplingResult(data) {
   var isUnknown = data.status === "UNKNOWN";
   var jaccardText = isUnknown
     ? "UNVERIFIED"
     : Number(data.jaccard_similarity || 0).toFixed(2) + "%";
-  var commonText = isUnknown ? "\u2014" : data.common_count;
+  var commonText = isUnknown ? "-" : data.common_count;
   var summaryCss = isUnknown ? "unknown" : (data.status === "YES" ? "self" : "");
 
   couplingSummaryGrid.innerHTML = "";
@@ -695,6 +719,7 @@ function showCouplingResult(data) {
     addDetailTo(couplingDetails, "Jaccard similarity", textNode(jaccardText));
   }
 
+  couplingSharedHeading.textContent = "Shared references (A \u2192 R and B \u2192 R)";
   couplingSharedList.innerHTML = "";
   var shared = Array.isArray(data.shared_references) ? data.shared_references : [];
   couplingSharedWrap.hidden = isUnknown || shared.length === 0;
@@ -707,12 +732,77 @@ function showCouplingResult(data) {
   couplingResults.hidden = false;
 }
 
+function showCoCitationResult(data) {
+  var isComplete = data.data_complete === true;
+  var hasExactJaccard = isComplete && typeof data.jaccard_similarity === "number";
+  var jaccardText = hasExactJaccard
+    ? Number(data.jaccard_similarity).toFixed(2) + "%"
+    : "UNVERIFIED";
+  var commonText = (data.status === "UNKNOWN" && data.common_count === null) ? "-" : data.common_count;
+  var summaryCss = data.status === "UNKNOWN" ? "unknown" : (data.status === "YES" ? "self" : "");
+
+  couplingSummaryGrid.innerHTML = "";
+  couplingSummaryGrid.appendChild(
+    makeSummaryItem({ label: "Co-Citation", css: summaryCss }, data.status)
+  );
+  couplingSummaryGrid.appendChild(
+    makeSummaryItem({ label: "Co-Citing Papers", css: "" }, commonText)
+  );
+  couplingSummaryGrid.appendChild(
+    makeSummaryItem({ label: "Jaccard Similarity", css: hasExactJaccard ? "reciprocal" : "unknown" }, jaccardText)
+  );
+
+  couplingDetails.innerHTML = "";
+  addDetailTo(couplingDetails, "Paper A", makeCouplingPaperNode(data.paper_a, data.paper_a_title));
+  addDetailTo(couplingDetails, "Paper B", makeCouplingPaperNode(data.paper_b, data.paper_b_title));
+  addDetailTo(couplingDetails, "Co-citation status", makeCouplingBadge(data.status));
+  addDetailTo(
+    couplingDetails,
+    "Citing data complete",
+    textNode(isComplete ? "YES (complete OpenAlex citing sets)" : "NO (partial or unverified citing data)")
+  );
+  if (Number.isInteger(data.unique_citers_a)) {
+    addDetailTo(couplingDetails, "Paper A unique citers", textNode(data.unique_citers_a));
+  }
+  if (Number.isInteger(data.unique_citers_b)) {
+    addDetailTo(couplingDetails, "Paper B unique citers", textNode(data.unique_citers_b));
+  }
+  if (Number.isInteger(data.common_count)) {
+    addDetailTo(couplingDetails, "Common co-citing papers", textNode(data.common_count));
+  }
+  if (Number.isInteger(data.union_count)) {
+    addDetailTo(couplingDetails, "Union citers", textNode(data.union_count));
+  }
+  addDetailTo(couplingDetails, "Jaccard similarity", textNode(jaccardText));
+
+  if (!isComplete) {
+    addDetailTo(
+      couplingDetails,
+      "Notes",
+      textNode("Incoming citing-paper sets are incomplete or truncated, so exact Jaccard similarity is marked UNVERIFIED.")
+    );
+  }
+
+  couplingSharedHeading.textContent = "Common co-citing papers (C \u2192 A and C \u2192 B)";
+  couplingSharedList.innerHTML = "";
+  var citers = Array.isArray(data.co_citing_papers) ? data.co_citing_papers : [];
+  couplingSharedWrap.hidden = citers.length === 0;
+  citers.forEach(function (citer) {
+    var item = document.createElement("li");
+    item.appendChild(makeCouplingPaperNode(citer.id, citer.title));
+    couplingSharedList.appendChild(item);
+  });
+
+  couplingResults.hidden = false;
+}
+
 async function handleCouplingSubmit(event) {
   event.preventDefault();
   if (isCouplingBusy) {
     return;
   }
 
+  var mode = getSelectedComparisonMode();
   var idA = normalizeQuery(couplingInputA.value).toUpperCase();
   var idB = normalizeQuery(couplingInputB.value).toUpperCase();
   var workIdRegex = /^W[A-Za-z0-9_]{1,28}$/;
@@ -721,16 +811,31 @@ async function handleCouplingSubmit(event) {
     showStatus(couplingStatus, "Please enter two valid OpenAlex Work IDs (e.g. W2919115771 and W1901616594).", "error");
     return;
   }
+  if (mode === "cocitation" && idA === idB) {
+    showStatus(couplingStatus, "Paper A and Paper B must have distinct OpenAlex Work IDs for Co-Citation analysis.", "error");
+    return;
+  }
 
   isCouplingBusy = true;
   couplingButton.disabled = true;
   couplingButton.textContent = "Comparing...";
   couplingResults.hidden = true;
-  showStatus(couplingStatus, "Comparing outgoing reference sets...", "working");
+  showStatus(
+    couplingStatus,
+    mode === "cocitation"
+      ? "Checking incoming citations (OpenAlex and local cache)..."
+      : "Comparing outgoing reference sets...",
+    "working"
+  );
 
   try {
-    var result = await postJson(API_COUPLING, { paper_a: idA, paper_b: idB });
-    showCouplingResult(result);
+    if (mode === "cocitation") {
+      var cociteResult = await postJson(API_COCITATION, { paper_a: idA, paper_b: idB });
+      showCoCitationResult(cociteResult);
+    } else {
+      var couplingResult = await postJson(API_COUPLING, { paper_a: idA, paper_b: idB });
+      showCouplingResult(couplingResult);
+    }
     showStatus(couplingStatus, "Comparison complete.", "");
   } catch (error) {
     showStatus(couplingStatus, error.message, "error");
@@ -744,3 +849,9 @@ async function handleCouplingSubmit(event) {
 nodePanelClose.addEventListener("click", clearNodeSelection);
 searchForm.addEventListener("submit", handleSubmit);
 couplingForm.addEventListener("submit", handleCouplingSubmit);
+if (modeCouplingRadio) {
+  modeCouplingRadio.addEventListener("change", updateComparisonMethodHint);
+}
+if (modeCocitationRadio) {
+  modeCocitationRadio.addEventListener("change", updateComparisonMethodHint);
+}

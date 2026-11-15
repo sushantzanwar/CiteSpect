@@ -18,9 +18,9 @@
       <p class="intro">
         Enter a paper's DOI or OpenAlex Work ID to inspect the papers it cites.
         CiteSpect detects <strong>Self-Citations</strong> (shared OpenAlex author IDs via a C99 Hash Table with Separate
-        Chaining)
-        and <strong>Reciprocal Cross-Citations</strong> (mutual citations A &rarr; B and B &rarr; A via Adjacency-List
-        Graph traversal).
+        Chaining), <strong>Reciprocal Cross-Citations</strong> (mutual citations A &rarr; B and B &rarr; A via
+        Adjacency-List Graph traversal), <strong>Bibliographic Coupling</strong> (shared outgoing references), and
+        <strong>Co-Citation</strong> (shared incoming citations).
       </p>
     </div>
   </header>
@@ -114,12 +114,22 @@
     </section>
 
     <section id="coupling-section" class="card" aria-labelledby="coupling-heading">
-      <h2 id="coupling-heading">Compare two papers (Bibliographic Coupling)</h2>
-      <p class="hint">
-        Two papers are bibliographically coupled when they cite one or more common references. Jaccard similarity
-        measures reference overlap, not research quality.
+      <h2 id="coupling-heading">Compare two papers</h2>
+      <p id="comparison-method-hint" class="hint">
+        Two papers are bibliographically coupled when they cite one or more common references (A &rarr; R and
+        B &rarr; R). Jaccard similarity measures reference overlap, not research quality.
       </p>
       <form id="coupling-form" class="coupling-form" novalidate>
+        <div class="comparison-mode-row" role="radiogroup" aria-label="Comparison method">
+          <label class="mode-option">
+            <input type="radio" name="comparison_mode" id="mode-coupling" value="coupling" checked>
+            <span>Bibliographic Coupling (outgoing references)</span>
+          </label>
+          <label class="mode-option">
+            <input type="radio" name="comparison_mode" id="mode-cocitation" value="cocitation">
+            <span>Co-Citation (incoming citations)</span>
+          </label>
+        </div>
         <div class="coupling-form-grid">
           <div class="coupling-field">
             <label for="coupling-paper-a">Paper A OpenAlex Work ID</label>

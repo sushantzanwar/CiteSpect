@@ -686,3 +686,267 @@ int compare_papers_coupling(const char *paper_a_id, const char *paper_b_id)
     print_coupling_report(paper_a_id, paper_b_id, &res);
     return res.status != COUPLING_UNKNOWN;
 }
+
+/* ------------------------------------------------------------------
+ * Co-Citation Detection (third-party papers citing both A and B)
+ * ------------------------------------------------------------------ */
+
+static int normalize_work_id_str(const char *raw, char *out, size_t size)
+{
+    static const char prefix[] = "https://openalex.org/";
+    size_t plen = sizeof(prefix) - 1;
+    const char *id = raw;
+
+    if (raw == NULL || out == NULL || size == 0)
+        return 0;
+    if (strncmp(raw, prefix, plen) == 0)
+        id = raw + plen;
+    if (!is_valid_ref_id(id) || strlen(id) >= size)
+        return 0;
+    snprintf(out, size, "%s", id);
+    return 1;
+}
+
+static void reset_cocitation_result(CoCitationResult *out)
+{
+    out->status = COCITATION_UNKNOWN;
+    out->citers_a_complete = 0;
+    out->citers_b_complete = 0;
+    out->exact_jaccard = 0;
+    out->unique_citers_a = 0;
+    out->unique_citers_b = 0;
+    out->common_count = 0;
+    out->union_count = 0;
+    out->jaccard_pct = -1.0;
+}
+
+static int populate_citer_hash(RefHash *ht,
+                               const char citers[][PAPER_ID_LEN],
+                               int count,
+                               const char *id_a,
+                               const char *id_b,
+                               int *unique_count)
+{
+    int i;
+
+    *unique_count = 0;
+    for (i = 0; i < count; i++) {
+        char norm[PAPER_ID_LEN];
+        int is_new = 0;
+
+        if (!normalize_work_id_str(citers[i], norm, sizeof(norm)))
+            continue;
+        if (strcmp(norm, id_a) == 0 || strcmp(norm, id_b) == 0)
+            continue;
+        if (!ref_hash_insert(ht, norm, &is_new))
+            return 0;
+        *unique_count += is_new;
+    }
+    return 1;
+}
+
+static int scan_common_citers(const RefHash *ht_a,
+                              RefHash *ht_b,
+                              const char citers_b[][PAPER_ID_LEN],
+                              int count_b,
+                              const char *id_a,
+                              const char *id_b,
+                              CoCitationResult *out)
+{
+    int i;
+
+    for (i = 0; i < count_b; i++) {
+        char norm[PAPER_ID_LEN];
+        int is_new = 0;
+
+        if (!normalize_work_id_str(citers_b[i], norm, sizeof(norm)))
+            continue;
+        if (strcmp(norm, id_a) == 0 || strcmp(norm, id_b) == 0)
+            continue;
+        if (!ref_hash_insert(ht_b, norm, &is_new))
+            return 0;
+        if (!is_new)
+            continue;
+        out->unique_citers_b++;
+        if (ref_hash_contains(ht_a, norm)) {
+            if (out->common_count < PAPER_MAX_REFS)
+                snprintf(out->co_citing_ids[out->common_count], PAPER_ID_LEN, "%s", norm);
+            out->common_count++;
+        }
+    }
+    return 1;
+}
+
+int citation_compute_cocitation(const char *paper_a_id,
+                                const char citers_a[][PAPER_ID_LEN],
+                                int count_a,
+                                int a_complete,
+                                const char *paper_b_id,
+                                const char citers_b[][PAPER_ID_LEN],
+                                int count_b,
+                                int b_complete,
+                                CoCitationResult *out)
+{
+    char norm_a[PAPER_ID_LEN];
+    char norm_b[PAPER_ID_LEN];
+    RefHash ht_a;
+    RefHash ht_b;
+
+    if (out == NULL)
+        return COCITATION_UNKNOWN;
+    reset_cocitation_result(out);
+
+    if (!normalize_work_id_str(paper_a_id, norm_a, sizeof(norm_a)) ||
+        !normalize_work_id_str(paper_b_id, norm_b, sizeof(norm_b)) ||
+        count_a < 0 || count_b < 0 ||
+        (count_a > 0 && citers_a == NULL) ||
+        (count_b > 0 && citers_b == NULL)) {
+        out->status = COCITATION_INVALID;
+        return COCITATION_INVALID;
+    }
+
+    if (strcmp(norm_a, norm_b) == 0) {
+        out->status = COCITATION_INVALID;
+        return COCITATION_INVALID;
+    }
+
+    ref_hash_init(&ht_a);
+    ref_hash_init(&ht_b);
+
+    if (!populate_citer_hash(&ht_a, citers_a, count_a, norm_a, norm_b, &out->unique_citers_a) ||
+        !scan_common_citers(&ht_a, &ht_b, citers_b, count_b, norm_a, norm_b, out)) {
+        ref_hash_free(&ht_a);
+        ref_hash_free(&ht_b);
+        reset_cocitation_result(out);
+        return COCITATION_UNKNOWN;
+    }
+
+    ref_hash_free(&ht_a);
+    ref_hash_free(&ht_b);
+
+    out->citers_a_complete = (a_complete != 0);
+    out->citers_b_complete = (b_complete != 0);
+    out->union_count = out->unique_citers_a + out->unique_citers_b - out->common_count;
+    out->exact_jaccard = (out->citers_a_complete && out->citers_b_complete);
+
+    if (out->exact_jaccard) {
+        out->jaccard_pct = (out->union_count > 0)
+            ? ((double)out->common_count * 100.0 / (double)out->union_count)
+            : 0.0;
+    } else {
+        out->jaccard_pct = -1.0;
+    }
+
+    if (out->common_count > 0)
+        out->status = COCITATION_YES;
+    else if (out->exact_jaccard)
+        out->status = COCITATION_NO;
+    else
+        out->status = COCITATION_UNKNOWN;
+
+    return out->status;
+}
+
+static void collect_citers_for_paper(const char *paper_id,
+                                     char out_ids[][PAPER_ID_LEN],
+                                     int max_out,
+                                     int *out_count,
+                                     int *out_complete)
+{
+    static CiterFetchResult fetch_res;
+    int csv_count;
+    int code;
+    int i;
+
+    *out_count = 0;
+    *out_complete = 0;
+
+    csv_count = csv_load_citing_papers(paper_id, out_ids, max_out);
+    *out_count = csv_count;
+
+    printf("Fetching citing papers for %s from OpenAlex...\n", paper_id);
+    code = openalex_fetch_citing_ids(paper_id, OPENALEX_MAX_CITER_PAGES, &fetch_res);
+    if (code != OPENALEX_OK) {
+        printf("Note: OpenAlex citing-paper fetch for %s failed (%s). Using local CSV only.\n",
+               paper_id, openalex_error_message(code));
+    }
+
+    for (i = 0; i < fetch_res.count && *out_count < max_out; i++) {
+        snprintf(out_ids[*out_count], PAPER_ID_LEN, "%s", fetch_res.ids[i]);
+        (*out_count)++;
+    }
+
+    *out_complete = (code == OPENALEX_OK && fetch_res.api_succeeded && fetch_res.is_complete);
+}
+
+static const char *cocitation_status_label(int status)
+{
+    if (status == COCITATION_YES)
+        return "YES";
+    if (status == COCITATION_NO)
+        return "NO";
+    if (status == COCITATION_INVALID)
+        return "INVALID";
+    return "UNKNOWN";
+}
+
+static void print_cocitation_report(const char *paper_a_id,
+                                    const char *paper_b_id,
+                                    const CoCitationResult *res)
+{
+    int i;
+    int printed;
+
+    printf("\n========== CO-CITATION ANALYSIS ==========\n\n");
+    printf("Paper A: %s\n", paper_a_id);
+    printf("Paper B: %s\n", paper_b_id);
+    printf("Co-Citation: %s\n", cocitation_status_label(res->status));
+    printf("Citing Data Complete: %s\n", res->exact_jaccard ? "YES" : "NO");
+    printf("Paper A Unique Citers: %d\n", res->unique_citers_a);
+    printf("Paper B Unique Citers: %d\n", res->unique_citers_b);
+    printf("Co-Citing Papers (Common): %d\n", res->common_count);
+    printf("Union Citers: %d\n", res->union_count);
+    if (res->exact_jaccard)
+        printf("Jaccard Similarity: %.2f%%\n", res->jaccard_pct);
+    else
+        printf("Jaccard Similarity: N/A (incomplete citing data)\n");
+
+    printed = (res->common_count < PAPER_MAX_REFS) ? res->common_count : PAPER_MAX_REFS;
+    for (i = 0; i < printed; i++)
+        printf("Co-Citing Paper: %s\n", res->co_citing_ids[i]);
+}
+
+int compare_papers_cocitation(const char *paper_a_id, const char *paper_b_id)
+{
+    static char citers_a[2 * PAPER_MAX_REFS][PAPER_ID_LEN];
+    static char citers_b[2 * PAPER_MAX_REFS][PAPER_ID_LEN];
+    char id_a[PAPER_ID_LEN];
+    char id_b[PAPER_ID_LEN];
+    CoCitationResult res;
+    int count_a = 0;
+    int count_b = 0;
+    int comp_a = 0;
+    int comp_b = 0;
+
+    reset_cocitation_result(&res);
+    if (!normalize_work_id_str(paper_a_id, id_a, sizeof(id_a)) ||
+        !normalize_work_id_str(paper_b_id, id_b, sizeof(id_b))) {
+        printf("Invalid paper ID.\n");
+        return 0;
+    }
+
+    if (strcmp(id_a, id_b) == 0) {
+        printf("Error: Paper A and Paper B must have distinct Work IDs.\n");
+        return 0;
+    }
+
+    collect_citers_for_paper(id_a, citers_a, 2 * PAPER_MAX_REFS, &count_a, &comp_a);
+    collect_citers_for_paper(id_b, citers_b, 2 * PAPER_MAX_REFS, &count_b, &comp_b);
+
+    citation_compute_cocitation(id_a, (const char (*)[PAPER_ID_LEN])citers_a, count_a, comp_a,
+                                id_b, (const char (*)[PAPER_ID_LEN])citers_b, count_b, comp_b,
+                                &res);
+
+    print_cocitation_report(id_a, id_b, &res);
+    return (res.status == COCITATION_YES || res.status == COCITATION_NO);
+}

@@ -36,6 +36,7 @@ static void show_menu(void) {
   printf("4. Analyze citations of a paper\n");
   printf("5. Exit\n");
   printf("6. Compare two papers (Bibliographic Coupling)\n");
+  printf("7. Compare two papers (Co-Citation)\n");
 }
 
 static void search_paper(PaperNode *head) {
@@ -104,13 +105,26 @@ static void compare_coupling_menu(void) {
   compare_papers_coupling(id_a, id_b);
 }
 
+static void compare_cocitation_menu(void) {
+  char id_a[PAPER_ID_LEN];
+  char id_b[PAPER_ID_LEN];
+
+  if (!read_line("Enter Paper A ID: ", id_a, sizeof(id_a)))
+    return;
+  if (!read_line("Enter Paper B ID: ", id_b, sizeof(id_b)))
+    return;
+  compare_papers_cocitation(id_a, id_b);
+}
+
 static void run_other_choice(int choice) {
   if (choice == 4)
     analyze_citations();
   else if (choice == 6)
     compare_coupling_menu();
+  else if (choice == 7)
+    compare_cocitation_menu();
   else if (choice != 5)
-    printf("\nInvalid choice. Please enter 1-6.\n");
+    printf("\nInvalid choice. Please enter 1-7.\n");
 }
 
 static PaperNode *run_choice(int choice, PaperNode *head) {
@@ -215,5 +229,7 @@ int main(int argc, char *argv[]) {
     return run_doi_mode(argv[2]);
   if (argc >= 4 && strcmp(argv[1], "--coupling") == 0)
     return compare_papers_coupling(argv[2], argv[3]) ? 0 : 1;
+  if (argc >= 4 && strcmp(argv[1], "--cocitation") == 0)
+    return compare_papers_cocitation(argv[2], argv[3]) ? 0 : 1;
   return run_menu();
 }
