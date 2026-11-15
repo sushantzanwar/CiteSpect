@@ -56,22 +56,20 @@
 
       <h3>What the categories mean</h3>
       <dl class="definitions">
-        <dt>Self-Citation (SELF / NOT IDENTIFIED AS SELF)</dt>
-        <dd>The citing and cited papers share at least one exact OpenAlex author ID in the C99 Separate-Chaining Hash
-          Table.</dd>
-        <dt>Confirmed Reciprocal Citation (CONFIRMED RECIPROCAL)</dt>
-        <dd>Paper A cites Paper B (A &rarr; B) and Paper B's outgoing reference graph also cites Paper A (B &rarr; A).
-        </dd>
-        <dt>Not Reciprocal (NOT RECIPROCAL)</dt>
-        <dd>Paper B's outgoing reference list was retrieved and verified, and no reverse citation edge (B &rarr; A)
-          exists.</dd>
-        <dt>Reciprocal Unknown (UNKNOWN)</dt>
-        <dd>Paper B's reference metadata is unavailable or could not be fetched from OpenAlex, so reciprocity cannot be
-          verified.</dd>
+        <dt>Self-Citation (SELF)</dt>
+        <dd>Two papers share at least one author.</dd>
+        <dt>Reciprocal Citation (RECIPROCAL)</dt>
+        <dd>Two papers cite each other.</dd>
+        <dt>One-Way Citation (ONE-WAY)</dt>
+        <dd>A reverse citation was not found in the verified reference data.</dd>
+        <dt>Unverified (UNVERIFIED)</dt>
+        <dd>Required metadata is unavailable.</dd>
+        <dt>Other / Unconfirmed Self (OTHER / UNCONFIRMED SELF)</dt>
+        <dd>No shared author was established.</dd>
       </dl>
       <p class="hint">
-        Self-citation is common when authors build on their own earlier work. Unmatched author lists are labeled
-        <em>Not Identified as Self</em> because missing author IDs cannot prove cross-citation.
+        <strong>SELF</strong> and <strong>RECIPROCAL</strong> are independent properties, so one citation can belong to
+        both categories.
       </p>
     </section>
 
@@ -113,6 +111,38 @@
         </aside>
       </div>
       <ul id="graph-legend" class="legend"></ul>
+    </section>
+
+    <section id="coupling-section" class="card" aria-labelledby="coupling-heading">
+      <h2 id="coupling-heading">Compare two papers (Bibliographic Coupling)</h2>
+      <p class="hint">
+        Two papers are bibliographically coupled when they cite one or more common references. Jaccard similarity
+        measures reference overlap, not research quality.
+      </p>
+      <form id="coupling-form" class="coupling-form" novalidate>
+        <div class="coupling-form-grid">
+          <div class="coupling-field">
+            <label for="coupling-paper-a">Paper A OpenAlex Work ID</label>
+            <input type="text" id="coupling-paper-a" name="paper_a" autocomplete="off"
+              placeholder="W2919115771">
+          </div>
+          <div class="coupling-field">
+            <label for="coupling-paper-b">Paper B OpenAlex Work ID</label>
+            <input type="text" id="coupling-paper-b" name="paper_b" autocomplete="off"
+              placeholder="W1901616594">
+          </div>
+          <button type="submit" id="coupling-button">Compare</button>
+        </div>
+      </form>
+      <p id="coupling-status" class="status" role="status" aria-live="polite"></p>
+      <div id="coupling-results" hidden>
+        <div id="coupling-summary-grid" class="summary-grid"></div>
+        <dl id="coupling-details" class="details"></dl>
+        <div id="coupling-shared-wrap" hidden>
+          <h3 id="coupling-shared-heading">Shared references</h3>
+          <ul id="coupling-shared-list" class="author-list"></ul>
+        </div>
+      </div>
     </section>
 
   </main>

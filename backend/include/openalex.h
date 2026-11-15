@@ -10,6 +10,8 @@
 #define OPENALEX_ERR_PARSE 4
 #define OPENALEX_ERR_BAD_ID 5
 
+int openalex_parse_work(const char *json, const char *input_doi, Paper *out);
+
 int openalex_fetch_by_doi(const char *doi, Paper *out);
 
 int openalex_fetch_by_id(const char *work_id, Paper *out);

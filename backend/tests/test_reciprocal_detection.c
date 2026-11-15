@@ -1,23 +1,36 @@
 /*
  * test_reciprocal_detection.c
  *
- * Synthetic unit tests for Stage 2 Reciprocal Cross-Citation Detection.
+ * Unit & integration tests for Stage 2 Reciprocal Cross-Citation Detection.
+ * Tests the actual production functions in citation_analysis.c:
+ *   - citation_check_reciprocal()
+ *   - citation_is_duplicate()
+ *   - analyze_paper_citations()
  *
- * Covers required test cases:
- *   1. A -> B and B -> A: CONFIRMED RECIPROCAL.
- *   2. A -> C but C does not cite A (refs available): NOT RECIPROCAL.
- *   3. A -> D but D's references are unavailable: UNKNOWN.
- *   4. Empty references with verified availability: NOT RECIPROCAL.
- *   5. Failed metadata retrieval (simulated OpenAlex error): UNKNOWN.
- *   6. Duplicate citation edges: no double counting.
- *   7. Combined SELF and RECIPROCAL classification on single paper.
- *   8. Edge cases: NULL / empty IDs.
- *
- * All tests use in-memory synthetic structs. No real CSV files are modified.
+ * Uses an isolated temporary working directory for all CSV operations so real
+ * project CSV files are never touched and no tests are conditionally skipped.
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+
+#ifdef _WIN32
+#include <direct.h>
+#include <process.h>
+#define MKDIR(p) _mkdir(p)
+#define CHDIR(p) _chdir(p)
+#define GETCWD(b, s) _getcwd(b, s)
+#define GETPID() _getpid()
+#else
+#include <sys/stat.h>
+#include <unistd.h>
+#define MKDIR(p) mkdir((p), 0700)
+#define CHDIR(p) chdir(p)
+#define GETCWD(b, s) getcwd(b, s)
+#define GETPID() getpid()
+#endif
+
 #include "citation_analysis.h"
 #include "citation_graph.h"
 #include "author_hash.h"
@@ -38,151 +51,157 @@ static int failed = 0;
         }                                                          \
     } while (0)
 
-/* Helper: simulates the reciprocity check using CitationGraph as in citation_analysis.c */
-static int simulate_check_reciprocal(const Paper *cited, const char *citing_id, int refs_available)
+static int setup_isolated_workdir(char *orig_cwd, size_t orig_size,
+                                  char *temp_dir, size_t temp_size)
 {
-    CitationGraph *graph;
-    int has_rev;
-    int i;
+    const char *base = getenv("TEMP");
+    char data_dir[512];
 
-    if (!refs_available)
-        return RECIPROCAL_UNKNOWN;
+    if (GETCWD(orig_cwd, (int)orig_size) == NULL)
+        return 0;
 
-    graph = citation_graph_create(cited->paper_id);
-    if (graph == NULL)
-        return RECIPROCAL_UNKNOWN;
+    if (base == NULL || base[0] == '\0')
+        base = getenv("TMP");
+    if (base == NULL || base[0] == '\0')
+        base = ".";
 
-    for (i = 0; i < cited->reference_count; i++) {
-        citation_graph_add_reference(graph, cited->references[i]);
-    }
+    snprintf(temp_dir, temp_size, "%s/citespect_recip_test_%d", base, (int)GETPID());
+    MKDIR(temp_dir);
+    snprintf(data_dir, sizeof(data_dir), "%s/data", temp_dir);
+    MKDIR(data_dir);
 
-    has_rev = citation_graph_has_reference(graph, citing_id);
-    citation_graph_free(graph);
-
-    return has_rev ? RECIPROCAL_CONFIRMED : RECIPROCAL_NOT;
+    return CHDIR(temp_dir) == 0;
 }
 
-/* Helper for duplicate checking as implemented in citation_analysis.c */
-static int is_duplicate(char cited_ids[][PAPER_ID_LEN], int index)
+static void cleanup_isolated_workdir(const char *orig_cwd, const char *temp_dir)
 {
-    int i;
-    for (i = 0; i < index; i++) {
-        if (strcmp(cited_ids[i], cited_ids[index]) == 0)
-            return 1;
-    }
-    return 0;
+    char path[512];
+
+    snprintf(path, sizeof(path), "%s/data/papers.csv", temp_dir);
+    remove(path);
+    snprintf(path, sizeof(path), "%s/data/authors.csv", temp_dir);
+    remove(path);
+    snprintf(path, sizeof(path), "%s/data/citations.csv", temp_dir);
+    remove(path);
+    snprintf(path, sizeof(path), "%s/data", temp_dir);
+#ifdef _WIN32
+    _rmdir(path);
+    CHDIR(orig_cwd);
+    _rmdir(temp_dir);
+#else
+    rmdir(path);
+    CHDIR(orig_cwd);
+    rmdir(temp_dir);
+#endif
 }
 
 static void test_confirmed_reciprocal(void)
 {
-    /* Paper A cites Paper B; Paper B cites Paper A */
     Paper paper_b;
+    int status;
+
     paper_init(&paper_b, "W_PAPER_B", "Cited Paper B", 2020, "");
-    paper_add_reference(&paper_b, "W_PAPER_A"); /* B -> A */
+    paper_add_reference(&paper_b, "W_PAPER_A");
     paper_add_reference(&paper_b, "W_OTHER_1");
 
-    int status = simulate_check_reciprocal(&paper_b, "W_PAPER_A", 1);
+    status = citation_check_reciprocal(&paper_b, "W_PAPER_A", 1);
     CHECK("Test 1: A -> B and B -> A yields RECIPROCAL_CONFIRMED",
           status == RECIPROCAL_CONFIRMED);
 }
 
 static void test_not_reciprocal_with_references(void)
 {
-    /* Paper A cites Paper C; Paper C has references, but none cite A */
     Paper paper_c;
+    int status;
+
     paper_init(&paper_c, "W_PAPER_C", "Cited Paper C", 2019, "");
     paper_add_reference(&paper_c, "W_OTHER_1");
     paper_add_reference(&paper_c, "W_OTHER_2");
 
-    int status = simulate_check_reciprocal(&paper_c, "W_PAPER_A", 1);
+    status = citation_check_reciprocal(&paper_c, "W_PAPER_A", 1);
     CHECK("Test 2: A -> C where C does not cite A yields RECIPROCAL_NOT",
           status == RECIPROCAL_NOT);
 }
 
 static void test_reciprocal_unknown_when_refs_unavailable(void)
 {
-    /* Paper A cites Paper D; D's references could not be loaded/fetched */
     Paper paper_d;
+    int status;
+
     paper_init(&paper_d, "W_PAPER_D", "Cited Paper D", 2021, "");
-    /* Even if paper_d struct had references, refs_available = 0 marks it UNKNOWN */
-    int status = simulate_check_reciprocal(&paper_d, "W_PAPER_A", 0);
+    status = citation_check_reciprocal(&paper_d, "W_PAPER_A", 0);
     CHECK("Test 3: References unavailable yields RECIPROCAL_UNKNOWN",
           status == RECIPROCAL_UNKNOWN);
 }
 
 static void test_not_reciprocal_empty_references_verified(void)
 {
-    /* Paper E was fetched and truly has 0 references indexed */
     Paper paper_e;
+    int status;
+
     paper_init(&paper_e, "W_PAPER_E", "Cited Paper E", 2022, "");
-    /* 0 references, but refs_available = 1 */
-    int status = simulate_check_reciprocal(&paper_e, "W_PAPER_A", 1);
+    status = citation_check_reciprocal(&paper_e, "W_PAPER_A", 1);
     CHECK("Test 4: Verified empty references yields RECIPROCAL_NOT",
           status == RECIPROCAL_NOT);
 }
 
 static void test_failed_metadata_simulation(void)
 {
-    /* If metadata retrieval failed completely, status is treated as UNKNOWN */
-    int refs_available = 0;
     Paper dummy;
+    int status;
+
     paper_init(&dummy, "W_FAILED", "Failed", 0, "");
-    int status = simulate_check_reciprocal(&dummy, "W_PAPER_A", refs_available);
+    status = citation_check_reciprocal(&dummy, "W_PAPER_A", 0);
     CHECK("Test 5: Failed metadata retrieval simulation yields RECIPROCAL_UNKNOWN",
           status == RECIPROCAL_UNKNOWN);
 }
 
 static void test_duplicate_citation_edges_suppressed(void)
 {
-    /* Ensure duplicate records in citations list are correctly filtered */
     char cited_ids[4][PAPER_ID_LEN] = {
         "W_PAPER_B",
         "W_PAPER_C",
-        "W_PAPER_B", /* Duplicate */
+        "W_PAPER_B",
         "W_PAPER_D"
     };
 
-    CHECK("Test 6a: First occurrence is not duplicate", is_duplicate(cited_ids, 0) == 0);
-    CHECK("Test 6b: Second unique occurrence is not duplicate", is_duplicate(cited_ids, 1) == 0);
-    CHECK("Test 6c: Duplicate occurrence is correctly identified", is_duplicate(cited_ids, 2) == 1);
-    CHECK("Test 6d: Third unique occurrence is not duplicate", is_duplicate(cited_ids, 3) == 0);
+    CHECK("Test 6a: First occurrence is not duplicate",
+          citation_is_duplicate(cited_ids, 0) == 0);
+    CHECK("Test 6b: Second unique occurrence is not duplicate",
+          citation_is_duplicate(cited_ids, 1) == 0);
+    CHECK("Test 6c: Duplicate occurrence is correctly identified",
+          citation_is_duplicate(cited_ids, 2) == 1);
+    CHECK("Test 6d: Third unique occurrence is not duplicate",
+          citation_is_duplicate(cited_ids, 3) == 0);
 }
 
 static void test_combined_self_and_reciprocal_matrix(void)
 {
-    /*
-     * Verify that SELF citation and RECIPROCAL citation are completely independent:
-     * Case A: SELF and RECIPROCAL (e.g. co-author paper that mutually cites)
-     * Case B: NOT SELF and RECIPROCAL (e.g. cross-citation that is mutual)
-     * Case C: SELF and NOT RECIPROCAL (e.g. citing an earlier paper of oneself)
-     * Case D: NOT SELF and NOT RECIPROCAL (standard external reference)
-     */
     AuthorHash ht;
     Paper citing, cited_a, cited_b;
+    int is_self_a, recip_a, is_self_b, recip_b;
+
     author_hash_init(&ht);
 
     paper_init(&citing, "W_MAIN", "Main Paper", 2020, "");
     paper_add_author(&citing, "AUTH_1", "Alice");
-
     author_hash_build(&ht, &citing);
 
-    /* Case A: shares AUTH_1, and cited_a cites W_MAIN */
     paper_init(&cited_a, "W_CITED_A", "Paper A", 2020, "");
     paper_add_author(&cited_a, "AUTH_1", "Alice");
     paper_add_reference(&cited_a, "W_MAIN");
 
-    int is_self_a = (hash_search(&ht, cited_a.author_ids[0]) != NULL);
-    int recip_a = simulate_check_reciprocal(&cited_a, "W_MAIN", 1);
+    is_self_a = (hash_search(&ht, cited_a.author_ids[0]) != NULL);
+    recip_a = citation_check_reciprocal(&cited_a, "W_MAIN", 1);
     CHECK("Test 7a: Case A is SELF", is_self_a == 1);
     CHECK("Test 7b: Case A is CONFIRMED RECIPROCAL", recip_a == RECIPROCAL_CONFIRMED);
 
-    /* Case B: does NOT share AUTH_1, but cited_b cites W_MAIN */
     paper_init(&cited_b, "W_CITED_B", "Paper B", 2020, "");
     paper_add_author(&cited_b, "AUTH_2", "Bob");
     paper_add_reference(&cited_b, "W_MAIN");
 
-    int is_self_b = (hash_search(&ht, cited_b.author_ids[0]) != NULL);
-    int recip_b = simulate_check_reciprocal(&cited_b, "W_MAIN", 1);
+    is_self_b = (hash_search(&ht, cited_b.author_ids[0]) != NULL);
+    recip_b = citation_check_reciprocal(&cited_b, "W_MAIN", 1);
     CHECK("Test 7c: Case B is NOT SELF", is_self_b == 0);
     CHECK("Test 7d: Case B is CONFIRMED RECIPROCAL (Reciprocal Cross-Citation)",
           recip_b == RECIPROCAL_CONFIRMED);
@@ -192,13 +211,6 @@ static void test_combined_self_and_reciprocal_matrix(void)
 
 static void test_csv_reference_cache_reliability(void)
 {
-    /*
-     * Only run CSV file tests when data/papers.csv does not already contain
-     * production data (i.e. inside an isolated test directory where data/ is empty).
-     */
-    if (paper_already_saved("W2787225861"))
-        return;
-
     Paper p_zero, p_missing, p_overwrite;
     char loaded[PAPER_MAX_REFS][PAPER_ID_LEN];
 
@@ -233,8 +245,46 @@ static void test_csv_reference_cache_reliability(void)
           csv_load_citations("W_LATE_REFS", loaded, PAPER_MAX_REFS) == 2);
 }
 
+static void test_analyze_paper_citations_production(void)
+{
+    Paper main_p, cited_a, cited_b;
+
+    paper_init(&main_p, "W_MAIN", "Main Paper", 2024, "10.0/main");
+    paper_add_author(&main_p, "AUTH_1", "Alice");
+    paper_add_reference(&main_p, "W_CITED_A");
+    paper_add_reference(&main_p, "W_CITED_B");
+    paper_add_reference(&main_p, "W_ZERO_REFS");
+    paper_add_reference(&main_p, "W_CITED_A"); /* duplicate */
+    paper_add_reference(&main_p, "W_MAIN");    /* self-reference */
+
+    paper_init(&cited_a, "W_CITED_A", "Cited A", 2023, "10.0/a");
+    paper_add_author(&cited_a, "AUTH_1", "Alice");
+    paper_add_reference(&cited_a, "W_MAIN");
+
+    paper_init(&cited_b, "W_CITED_B", "Cited B", 2023, "10.0/b");
+    paper_add_author(&cited_b, "AUTH_2", "Bob");
+    paper_add_reference(&cited_b, "W_MAIN");
+
+    CHECK("Test 9a: Save synthetic citing/cited papers in isolated CSVs",
+          csv_save_paper(&main_p) == CSV_SAVED &&
+          csv_save_paper(&cited_a) == CSV_SAVED &&
+          csv_save_paper(&cited_b) == CSV_SAVED);
+    CHECK("Test 9b: Production analyze_paper_citations runs end-to-end on cached CSVs",
+          analyze_paper_citations("W_MAIN") == 1);
+    CHECK("Test 9c: Unsaved paper returns 0 from analyze_paper_citations",
+          analyze_paper_citations("W_MISSING_999") == 0);
+}
+
 int main(void)
 {
+    char orig_cwd[512];
+    char temp_dir[512];
+
+    if (!setup_isolated_workdir(orig_cwd, sizeof(orig_cwd), temp_dir, sizeof(temp_dir))) {
+        fprintf(stderr, "Failed to create isolated test directory.\n");
+        return 1;
+    }
+
     printf("===================================================\n");
     printf("  CITESPECT STAGE 2 RECIPROCAL CITATION UNIT TESTS \n");
     printf("===================================================\n\n");
@@ -247,11 +297,12 @@ int main(void)
     test_duplicate_citation_edges_suppressed();
     test_combined_self_and_reciprocal_matrix();
     test_csv_reference_cache_reliability();
+    test_analyze_paper_citations_production();
 
     printf("\n---------------------------------------------------\n");
     printf("Results: %d passed, %d failed\n", passed, failed);
     printf("---------------------------------------------------\n");
 
+    cleanup_isolated_workdir(orig_cwd, temp_dir);
     return (failed == 0) ? 0 : 1;
 }
-

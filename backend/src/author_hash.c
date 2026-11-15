@@ -71,7 +71,8 @@ const AuthorNode *hash_search(const AuthorHash *ht,
     unsigned int idx;
     const AuthorNode *node;
 
-    if (ht == NULL || author_id == NULL || author_id[0] == '\0')
+    if (ht == NULL || author_id == NULL || author_id[0] == '\0' ||
+        strlen(author_id) >= PAPER_ID_LEN)
         return NULL;
 
     idx  = hash_author_id(author_id);
@@ -106,8 +107,9 @@ int hash_insert(AuthorHash *ht,
     unsigned int idx;
     AuthorNode *node;
 
-    /* Reject NULL table or empty IDs */
-    if (ht == NULL || author_id == NULL || author_id[0] == '\0')
+    /* Reject NULL table, empty IDs, or oversized IDs */
+    if (ht == NULL || author_id == NULL || author_id[0] == '\0' ||
+        strlen(author_id) >= PAPER_ID_LEN)
         return 0;
 
     /* Reject duplicates */
@@ -155,7 +157,7 @@ void author_hash_build(AuthorHash *ht, const Paper *paper)
     if (ht == NULL || paper == NULL)
         return;
 
-    for (i = 0; i < paper->author_count; i++) {
+    for (i = 0; i < paper->author_count && i < PAPER_MAX_AUTHORS; i++) {
         if (paper->author_ids[i][0] == '\0')
             continue;
         hash_insert(ht, paper->author_ids[i], paper->authors[i]);

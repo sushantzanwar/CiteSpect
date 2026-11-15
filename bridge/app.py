@@ -51,6 +51,18 @@ def run_c_analysis(paper_id):
     return result.stdout.decode("utf-8", errors="replace").splitlines()
 
 
+def run_c_coupling(paper_a_id, paper_b_id):
+    workdir = get_workdir()
+    with c_program_lock:
+        result = subprocess.run(
+            [EXE_PATH, "--coupling", paper_a_id, paper_b_id],
+            cwd=workdir,
+            capture_output=True,
+            timeout=180,
+        )
+    return result.stdout.decode("utf-8", errors="replace").splitlines()
+
+
 def parse_output(lines):
     data = {"authors": [], "references": [], "citation_graph": []}
     inside = False
@@ -331,6 +343,104 @@ def citation_analysis():
         if not_saved:
             return jsonify({"success": False, "error": not_saved.group(0)}), 404
     return jsonify({"success": False, "error": "The C program returned no analysis result."}), 502
+
+
+def parse_coupling(lines):
+    data = {
+        "paper_a": "",
+        "paper_b": "",
+        "status": "",
+        "unique_references_a": None,
+        "unique_references_b": None,
+        "common_count": None,
+        "union_count": None,
+        "jaccard_similarity": None,
+        "shared_references": [],
+    }
+    int_keys = {
+        "Paper A Unique References": "unique_references_a",
+        "Paper B Unique References": "unique_references_b",
+        "Common References": "common_count",
+        "Union References": "union_count",
+    }
+
+    for line in lines:
+        text = line.strip()
+        if ":" not in text:
+            continue
+        label, raw_val = [part.strip() for part in text.split(":", 1)]
+        if label == "Paper A":
+            data["paper_a"] = raw_val
+        elif label == "Paper B":
+            data["paper_b"] = raw_val
+        elif label == "Bibliographic Coupling":
+            data["status"] = raw_val
+        elif label in int_keys:
+            try:
+                data[int_keys[label]] = int(raw_val)
+            except ValueError:
+                pass
+        elif label == "Jaccard Similarity":
+            try:
+                data["jaccard_similarity"] = float(raw_val.rstrip("%").strip())
+            except ValueError:
+                pass
+        elif label == "Shared Reference" and raw_val:
+            data["shared_references"].append(raw_val)
+
+    if data["status"] == "UNKNOWN":
+        data["unique_references_a"] = None
+        data["unique_references_b"] = None
+        data["common_count"] = None
+        data["union_count"] = None
+        data["jaccard_similarity"] = None
+        data["shared_references"] = []
+
+    return data
+
+
+@app.route("/api/coupling", methods=["POST"])
+def coupling_analysis():
+    body = request.get_json(silent=True) or {}
+    paper_a = str(body.get("paper_a", "")).strip().upper()
+    paper_b = str(body.get("paper_b", "")).strip().upper()
+    work_id_pattern = r"W[A-Za-z0-9_]{1,28}"
+
+    if not re.fullmatch(work_id_pattern, paper_a) or not re.fullmatch(work_id_pattern, paper_b):
+        return jsonify({
+            "success": False,
+            "error": "Two valid OpenAlex Work IDs (like W2919115771 and W1901616594) are required.",
+        }), 400
+    if not os.path.exists(EXE_PATH):
+        return jsonify({"success": False, "error": "citespect.exe not found. Compile the C project first."}), 500
+
+    try:
+        lines = run_c_coupling(paper_a, paper_b)
+    except subprocess.TimeoutExpired:
+        return jsonify({"success": False, "error": "The bibliographic coupling comparison took too long."}), 504
+
+    parsed = parse_coupling(lines)
+    if parsed["status"] not in ("YES", "NO", "UNKNOWN"):
+        return jsonify({"success": False, "error": "The C program returned no bibliographic coupling result."}), 502
+
+    local_titles = load_local_titles()
+    return jsonify({
+        "success": True,
+        "paper_a": parsed["paper_a"] or paper_a,
+        "paper_a_title": local_titles.get(parsed["paper_a"] or paper_a, ""),
+        "paper_b": parsed["paper_b"] or paper_b,
+        "paper_b_title": local_titles.get(parsed["paper_b"] or paper_b, ""),
+        "status": parsed["status"],
+        "unique_references_a": parsed["unique_references_a"],
+        "unique_references_b": parsed["unique_references_b"],
+        "common_count": parsed["common_count"],
+        "union_count": parsed["union_count"],
+        "jaccard_similarity": parsed["jaccard_similarity"],
+        "shared_references": [
+            {"id": rid, "title": local_titles.get(rid, "")}
+            for rid in parsed["shared_references"]
+        ],
+    })
 
 
 if __name__ == "__main__":

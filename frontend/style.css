@@ -173,7 +173,7 @@ a:focus-visible {
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 8px;
 }
@@ -427,6 +427,21 @@ td a {
   font-size: 0.9rem;
 }
 
+.coupling-form {
+  margin-top: 12px;
+}
+
+.coupling-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.coupling-field input[type="text"] {
+  width: 100%;
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -437,6 +452,11 @@ td a {
 }
 
 @media (max-width: 600px) {
+  .summary-grid,
+  .coupling-form-grid {
+    grid-template-columns: 1fr;
+  }
+
   .form-row {
     flex-direction: column;
   }

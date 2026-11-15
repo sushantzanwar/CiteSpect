@@ -38,17 +38,30 @@ static FILE *open_csv(const char *path, const char *header)
     return f;
 }
 
+static int build_id_prefix(const char *paper_id, char *prefix, size_t size)
+{
+    int written;
+
+    if (paper_id == NULL || paper_id[0] == '\0' || strlen(paper_id) >= PAPER_ID_LEN)
+        return 0;
+    written = snprintf(prefix, size, "%s,", paper_id);
+    return written > 0 && (size_t)written < size;
+}
+
 int paper_already_saved(const char *paper_id)
 {
     char line[LINE_SIZE];
     char prefix[PAPER_ID_LEN + 1];
     int at_line_start = 1;
-    FILE *f = fopen(PAPERS_CSV, "r");
+    FILE *f;
 
+    if (!build_id_prefix(paper_id, prefix, sizeof(prefix)))
+        return 0;
+
+    f = fopen(PAPERS_CSV, "r");
     if (f == NULL)
         return 0;
 
-    sprintf(prefix, "%s,", paper_id);
     while (fgets(line, sizeof(line), f) != NULL) {
         if (at_line_start && strncmp(line, prefix, strlen(prefix)) == 0) {
             fclose(f);
@@ -134,12 +147,15 @@ int csv_load_authors(const char *paper_id, Paper *out)
 {
     char line[LINE_SIZE];
     char prefix[PAPER_ID_LEN + 1];
-    FILE *f = fopen(AUTHORS_CSV, "r");
+    FILE *f;
 
+    if (out == NULL || !build_id_prefix(paper_id, prefix, sizeof(prefix)))
+        return 0;
+
+    f = fopen(AUTHORS_CSV, "r");
     if (f == NULL)
         return 0;
 
-    sprintf(prefix, "%s,", paper_id);
     while (fgets(line, sizeof(line), f) != NULL) {
         if (strncmp(line, prefix, strlen(prefix)) == 0)
             add_author_from_line(line + strlen(prefix), out);
@@ -152,7 +168,7 @@ static int extract_cited_id(const char *after_prefix, char *out)
 {
     size_t len = strcspn(after_prefix, "\r\n");
 
-    if (len == 0)
+    if (len == 0 || len >= PAPER_ID_LEN)
         return 0;
     snprintf(out, PAPER_ID_LEN, "%.*s", (int)len, after_prefix);
     return 1;
@@ -163,12 +179,15 @@ int csv_load_citations(const char *citing_id, char cited_ids[][PAPER_ID_LEN], in
     char line[LINE_SIZE];
     char prefix[PAPER_ID_LEN + 1];
     int count = 0;
-    FILE *f = fopen(CITATIONS_CSV, "r");
+    FILE *f;
 
+    if (cited_ids == NULL || max <= 0 || !build_id_prefix(citing_id, prefix, sizeof(prefix)))
+        return 0;
+
+    f = fopen(CITATIONS_CSV, "r");
     if (f == NULL)
         return 0;
 
-    sprintf(prefix, "%s,", citing_id);
     while (count < max && fgets(line, sizeof(line), f) != NULL) {
         if (strncmp(line, prefix, strlen(prefix)) == 0)
             count += extract_cited_id(line + strlen(prefix), cited_ids[count]);
@@ -181,12 +200,15 @@ int paper_has_citations_saved(const char *paper_id)
 {
     char line[LINE_SIZE];
     char prefix[PAPER_ID_LEN + 1];
-    FILE *f = fopen(CITATIONS_CSV, "r");
+    FILE *f;
 
-    if (f == NULL || paper_id == NULL || paper_id[0] == '\0')
+    if (!build_id_prefix(paper_id, prefix, sizeof(prefix)))
         return 0;
 
-    sprintf(prefix, "%s,", paper_id);
+    f = fopen(CITATIONS_CSV, "r");
+    if (f == NULL)
+        return 0;
+
     while (fgets(line, sizeof(line), f) != NULL) {
         if (strncmp(line, prefix, strlen(prefix)) == 0) {
             fclose(f);

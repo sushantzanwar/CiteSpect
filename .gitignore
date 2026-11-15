@@ -1,8 +1,11 @@
-# Compiled C binaries and object files
+# Compiled C binaries, object files, and coverage artifacts
 *.exe
 *.o
 *.obj
 *.out
+*.gcno
+*.gcda
+*.gcov
 
 # Python cache
 __pycache__/
@@ -30,3 +33,4 @@ openalex_response.json
 .claude/
 .playwright-mcp/
 skills-lock.json
+

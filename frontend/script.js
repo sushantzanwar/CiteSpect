@@ -1,40 +1,42 @@
 var API_ANALYZE = "/api/analyze";
 var API_ANALYSIS = "/api/citation-analysis";
+var API_COUPLING = "/api/coupling";
 var SVG_NS = "http://www.w3.org/2000/svg";
+
+var COUPLING_BADGE_INFO = {
+  "YES": { text: "YES", cssClass: "type-self" },
+  "NO": { text: "NO", cssClass: "type-not-self" },
+  "UNKNOWN": { text: "UNKNOWN", cssClass: "type-unknown" }
+};
 
 var SELF_BADGE_INFO = {
   "SELF": { text: "SELF", cssClass: "type-self" },
-  "NOT IDENTIFIED AS SELF": { text: "NOT IDENTIFIED AS SELF", cssClass: "type-not-self" },
+  "NOT IDENTIFIED AS SELF": { text: "OTHER / UNCONFIRMED SELF", cssClass: "type-not-self" },
   "FAILED": { text: "FETCH FAILED", cssClass: "type-failed" },
   "PENDING": { text: "PENDING", cssClass: "type-failed" }
 };
 
 var RECIP_BADGE_INFO = {
-  "CONFIRMED RECIPROCAL": { text: "CONFIRMED RECIPROCAL", cssClass: "type-reciprocal" },
-  "NOT RECIPROCAL": { text: "NOT RECIPROCAL", cssClass: "type-not-reciprocal" },
-  "UNKNOWN": { text: "UNKNOWN", cssClass: "type-unknown" },
+  "CONFIRMED RECIPROCAL": { text: "RECIPROCAL", cssClass: "type-reciprocal" },
+  "NOT RECIPROCAL": { text: "ONE-WAY", cssClass: "type-not-reciprocal" },
+  "UNKNOWN": { text: "UNVERIFIED", cssClass: "type-unknown" },
   "PENDING": { text: "PENDING", cssClass: "type-failed" }
 };
 
 var GRAPH_TYPE_INFO = {
-  SELF_RECIPROCAL: { text: "SELF + RECIPROCAL", legend: "Self & Confirmed Reciprocal", color: "#5b21b6", cssClass: "type-reciprocal" },
-  SELF: { text: "SELF", legend: "Self-citation", color: "#0b5a54", cssClass: "type-self" },
-  RECIPROCAL: { text: "CONFIRMED RECIPROCAL", legend: "Confirmed Reciprocal", color: "#1d4ed8", cssClass: "type-reciprocal" },
-  NOT_SELF: { text: "NOT IDENTIFIED AS SELF", legend: "Not identified as self / Not reciprocal", color: "#14284b", cssClass: "type-not-self" },
-  UNKNOWN: { text: "RECIPROCAL UNKNOWN", legend: "Reciprocal unknown", color: "#a15c07", cssClass: "type-unknown" },
+  SELF_RECIPROCAL: { text: "SELF + RECIPROCAL", legend: "Self & Reciprocal", color: "#5b21b6", cssClass: "type-reciprocal" },
+  SELF: { text: "SELF", legend: "Self-Citation", color: "#0b5a54", cssClass: "type-self" },
+  RECIPROCAL: { text: "RECIPROCAL", legend: "Reciprocal Citation", color: "#1d4ed8", cssClass: "type-reciprocal" },
+  NOT_SELF: { text: "OTHER / UNCONFIRMED SELF", legend: "Other / Unconfirmed Self (One-Way)", color: "#14284b", cssClass: "type-not-self" },
+  UNKNOWN: { text: "UNVERIFIED", legend: "Unverified", color: "#a15c07", cssClass: "type-unknown" },
   FAILED: { text: "FETCH FAILED", legend: "Metadata retrieval failed", color: "#5f6b7a", cssClass: "type-failed" },
   PENDING: { text: "PENDING", legend: "Cited paper (pending analysis)", color: "#4a5a78", cssClass: "" }
 };
 
 var SUMMARY_ITEMS = [
-  { key: "analyzed", label: "Citations checked", css: "" },
-  { key: "self", label: "Self-citations", css: "self" },
-  { key: "not_self", label: "Not identified as self", css: "" },
-  { key: "reciprocal_confirmed", label: "Confirmed reciprocal", css: "reciprocal" },
-  { key: "reciprocal_not", label: "Not reciprocal", css: "" },
-  { key: "reciprocal_unknown", label: "Reciprocal unknown", css: "unknown" },
-  { key: "duplicates", label: "Duplicate records skipped", css: "" },
-  { key: "self_references", label: "Self-references skipped", css: "" }
+  { key: "analyzed", label: "Total Citations", css: "" },
+  { key: "self", label: "Self-Citations", css: "self" },
+  { key: "reciprocal_confirmed", label: "Reciprocal Citations", css: "reciprocal" }
 ];
 
 var searchForm = document.getElementById("search-form");
@@ -62,7 +64,19 @@ var nodePanel = document.getElementById("graph-node-panel");
 var nodePanelDetails = document.getElementById("node-panel-details");
 var nodePanelClose = document.getElementById("node-panel-close");
 
+var couplingForm = document.getElementById("coupling-form");
+var couplingInputA = document.getElementById("coupling-paper-a");
+var couplingInputB = document.getElementById("coupling-paper-b");
+var couplingButton = document.getElementById("coupling-button");
+var couplingStatus = document.getElementById("coupling-status");
+var couplingResults = document.getElementById("coupling-results");
+var couplingSummaryGrid = document.getElementById("coupling-summary-grid");
+var couplingDetails = document.getElementById("coupling-details");
+var couplingSharedWrap = document.getElementById("coupling-shared-wrap");
+var couplingSharedList = document.getElementById("coupling-shared-list");
+
 var isBusy = false;
+var isCouplingBusy = false;
 var selectedGraphState = null;
 
 
@@ -195,9 +209,8 @@ function makeSummaryItem(item, value) {
 function showSummary(summary) {
   summaryGrid.innerHTML = "";
   SUMMARY_ITEMS.forEach(function (item) {
-    if (Number.isInteger(summary[item.key])) {
-      summaryGrid.appendChild(makeSummaryItem(item, summary[item.key]));
-    }
+    var val = Number.isInteger(summary[item.key]) ? summary[item.key] : 0;
+    summaryGrid.appendChild(makeSummaryItem(item, val));
   });
 }
 
@@ -424,12 +437,14 @@ function drawGraph(centerId, citedPapers) {
     });
     edgesLayer.appendChild(edgeLine);
 
+    var selfInfo = SELF_BADGE_INFO[cited.self_citation] || SELF_BADGE_INFO["PENDING"];
+    var recipInfo = RECIP_BADGE_INFO[cited.reciprocal_citation] || RECIP_BADGE_INFO["PENDING"];
     var nodeGroup = svgElement("g", {
       class: "graph-node",
       tabindex: "0",
       role: "button",
       "aria-pressed": "false",
-      "aria-label": cited.id + " - Self-citation: " + (cited.self_citation || "PENDING") + ", Reciprocal: " + (cited.reciprocal_citation || "PENDING")
+      "aria-label": cited.id + " - Self-citation: " + selfInfo.text + ", Reciprocal: " + recipInfo.text
     });
 
     nodeGroup.appendChild(svgElement("circle", { cx: x, cy: y, r: dotRadius + 5, class: "graph-node-halo" }));
@@ -625,5 +640,107 @@ async function handleSubmit(event) {
   setBusy(false);
 }
 
+function makeCouplingPaperNode(id, title) {
+  var wrap = document.createElement("span");
+  wrap.appendChild(makeIdNode(id));
+  if (title) {
+    wrap.appendChild(textNode(" — " + title));
+  }
+  return wrap;
+}
+
+function makeCouplingBadge(status) {
+  var info = COUPLING_BADGE_INFO[status] || COUPLING_BADGE_INFO["UNKNOWN"];
+  var badge = document.createElement("span");
+  badge.className = "type-label " + info.cssClass;
+  badge.textContent = info.text;
+  return badge;
+}
+
+function showCouplingResult(data) {
+  var isUnknown = data.status === "UNKNOWN";
+  var jaccardText = isUnknown
+    ? "UNVERIFIED"
+    : Number(data.jaccard_similarity || 0).toFixed(2) + "%";
+  var commonText = isUnknown ? "\u2014" : data.common_count;
+  var summaryCss = isUnknown ? "unknown" : (data.status === "YES" ? "self" : "");
+
+  couplingSummaryGrid.innerHTML = "";
+  couplingSummaryGrid.appendChild(
+    makeSummaryItem({ label: "Bibliographic Coupling", css: summaryCss }, data.status)
+  );
+  couplingSummaryGrid.appendChild(
+    makeSummaryItem({ label: "Common References", css: "" }, commonText)
+  );
+  couplingSummaryGrid.appendChild(
+    makeSummaryItem({ label: "Jaccard Similarity", css: isUnknown ? "unknown" : "reciprocal" }, jaccardText)
+  );
+
+  couplingDetails.innerHTML = "";
+  addDetailTo(couplingDetails, "Paper A", makeCouplingPaperNode(data.paper_a, data.paper_a_title));
+  addDetailTo(couplingDetails, "Paper B", makeCouplingPaperNode(data.paper_b, data.paper_b_title));
+  addDetailTo(couplingDetails, "Coupling status", makeCouplingBadge(data.status));
+
+  if (isUnknown) {
+    addDetailTo(
+      couplingDetails,
+      "Notes",
+      textNode("Reference metadata is unavailable for one or both papers, so Jaccard similarity cannot be determined.")
+    );
+  } else {
+    addDetailTo(couplingDetails, "Paper A unique refs", textNode(data.unique_references_a));
+    addDetailTo(couplingDetails, "Paper B unique refs", textNode(data.unique_references_b));
+    addDetailTo(couplingDetails, "Common references", textNode(data.common_count));
+    addDetailTo(couplingDetails, "Union references", textNode(data.union_count));
+    addDetailTo(couplingDetails, "Jaccard similarity", textNode(jaccardText));
+  }
+
+  couplingSharedList.innerHTML = "";
+  var shared = Array.isArray(data.shared_references) ? data.shared_references : [];
+  couplingSharedWrap.hidden = isUnknown || shared.length === 0;
+  shared.forEach(function (ref) {
+    var item = document.createElement("li");
+    item.appendChild(makeCouplingPaperNode(ref.id, ref.title));
+    couplingSharedList.appendChild(item);
+  });
+
+  couplingResults.hidden = false;
+}
+
+async function handleCouplingSubmit(event) {
+  event.preventDefault();
+  if (isCouplingBusy) {
+    return;
+  }
+
+  var idA = normalizeQuery(couplingInputA.value).toUpperCase();
+  var idB = normalizeQuery(couplingInputB.value).toUpperCase();
+  var workIdRegex = /^W[A-Za-z0-9_]{1,28}$/;
+
+  if (!workIdRegex.test(idA) || !workIdRegex.test(idB)) {
+    showStatus(couplingStatus, "Please enter two valid OpenAlex Work IDs (e.g. W2919115771 and W1901616594).", "error");
+    return;
+  }
+
+  isCouplingBusy = true;
+  couplingButton.disabled = true;
+  couplingButton.textContent = "Comparing...";
+  couplingResults.hidden = true;
+  showStatus(couplingStatus, "Comparing outgoing reference sets...", "working");
+
+  try {
+    var result = await postJson(API_COUPLING, { paper_a: idA, paper_b: idB });
+    showCouplingResult(result);
+    showStatus(couplingStatus, "Comparison complete.", "");
+  } catch (error) {
+    showStatus(couplingStatus, error.message, "error");
+  }
+
+  isCouplingBusy = false;
+  couplingButton.disabled = false;
+  couplingButton.textContent = "Compare";
+}
+
 nodePanelClose.addEventListener("click", clearNodeSelection);
 searchForm.addEventListener("submit", handleSubmit);
+couplingForm.addEventListener("submit", handleCouplingSubmit);

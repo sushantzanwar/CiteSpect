@@ -4,14 +4,26 @@
 
 #include "citation_graph.h"
 
-CitationGraph *citation_graph_create(const char *paper_id) {
-  CitationGraph *graph = malloc(sizeof(CitationGraph));
+static int is_valid_graph_id(const char *id) {
+  if (id == NULL || id[0] == '\0') {
+    return 0;
+  }
+  return strlen(id) < PAPER_ID_LEN;
+}
 
+CitationGraph *citation_graph_create(const char *paper_id) {
+  CitationGraph *graph;
+
+  if (!is_valid_graph_id(paper_id)) {
+    return NULL;
+  }
+
+  graph = malloc(sizeof(CitationGraph));
   if (graph == NULL) {
     return NULL;
   }
 
-  strcpy(graph->paper_id, paper_id);
+  snprintf(graph->paper_id, PAPER_ID_LEN, "%s", paper_id);
   graph->references = NULL;
   graph->next = NULL;
 
@@ -23,17 +35,16 @@ int citation_graph_add_reference(CitationGraph *graph,
   CitationEdge *new_edge;
   CitationEdge *current;
 
-  if (graph == NULL || cited_paper_id == NULL) {
+  if (graph == NULL || !is_valid_graph_id(cited_paper_id)) {
     return 0;
   }
 
   new_edge = malloc(sizeof(CitationEdge));
-
   if (new_edge == NULL) {
     return 0;
   }
 
-  strcpy(new_edge->cited_paper_id, cited_paper_id);
+  snprintf(new_edge->cited_paper_id, PAPER_ID_LEN, "%s", cited_paper_id);
   new_edge->next = NULL;
 
   if (graph->references == NULL) {
@@ -56,7 +67,7 @@ int citation_graph_has_reference(const CitationGraph *graph,
                                  const char *target_id) {
   const CitationEdge *current;
 
-  if (graph == NULL || target_id == NULL || target_id[0] == '\0') {
+  if (graph == NULL || !is_valid_graph_id(target_id)) {
     return 0;
   }
 

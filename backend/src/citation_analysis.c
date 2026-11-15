@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "citation_analysis.h"
 #include "author_hash.h"
@@ -55,7 +56,7 @@ static int find_self_authors_hash(const AuthorHash *citing_ht,
     int count = 0;
     const AuthorNode *hit;
 
-    for (i = 0; i < cited->author_count && count < max_matches; i++) {
+    for (i = 0; i < cited->author_count && i < PAPER_MAX_AUTHORS && count < max_matches; i++) {
         if (cited->author_ids[i][0] == '\0')
             continue;
         hit = hash_search(citing_ht, cited->author_ids[i]);
@@ -201,20 +202,20 @@ static int load_cited_paper(const char *paper_id, Paper *out, int *refs_availabl
  * Check reciprocal citation using CitationGraph
  * ------------------------------------------------------------------ */
 
-static int check_reciprocal(const Paper *cited, const char *citing_id, int refs_available)
+int citation_check_reciprocal(const Paper *cited, const char *citing_id, int refs_available)
 {
     CitationGraph *graph;
     int has_rev;
     int i;
 
-    if (!refs_available)
+    if (!refs_available || cited == NULL)
         return RECIPROCAL_UNKNOWN;
 
     graph = citation_graph_create(cited->paper_id);
     if (graph == NULL)
         return RECIPROCAL_UNKNOWN;
 
-    for (i = 0; i < cited->reference_count; i++) {
+    for (i = 0; i < cited->reference_count && i < PAPER_MAX_REFS; i++) {
         citation_graph_add_reference(graph, cited->references[i]);
     }
 
@@ -271,7 +272,7 @@ static void analyze_one(const char *citing_id,
         summary->not_self_count++;
 
     /* 2. Reciprocal Cross-Citation detection via CitationGraph */
-    recip_status = check_reciprocal(&cited, citing_id, refs_available);
+    recip_status = citation_check_reciprocal(&cited, citing_id, refs_available);
     if (recip_status == RECIPROCAL_CONFIRMED)
         summary->recip_conf_count++;
     else if (recip_status == RECIPROCAL_NOT)
@@ -286,9 +287,12 @@ static void analyze_one(const char *citing_id,
  * Duplicate detection
  * ------------------------------------------------------------------ */
 
-static int is_duplicate(char cited_ids[][PAPER_ID_LEN], int index)
+int citation_is_duplicate(char cited_ids[][PAPER_ID_LEN], int index)
 {
     int i;
+
+    if (cited_ids == NULL || index < 0)
+        return 0;
 
     for (i = 0; i < index; i++) {
         if (strcmp(cited_ids[i], cited_ids[index]) == 0)
@@ -312,7 +316,7 @@ static void analyze_all(const char *citing_id,
     for (i = 0; i < total; i++) {
         if (strcmp(cited_ids[i], citing_id) == 0) {
             summary->self_ref_count++;
-        } else if (is_duplicate(cited_ids, i)) {
+        } else if (citation_is_duplicate(cited_ids, i)) {
             summary->dup_count++;
         } else {
             analyze_one(citing_id, citing_ht, cited_ids[i], summary);
@@ -366,6 +370,11 @@ int analyze_paper_citations(const char *citing_id)
     CitationSummary summary = {0, 0, 0, 0, 0, 0, 0};
     AuthorHash citing_ht;
     int total;
+
+    if (citing_id == NULL || citing_id[0] == '\0' || strlen(citing_id) >= PAPER_ID_LEN) {
+        printf("Invalid paper ID.\n");
+        return 0;
+    }
 
     if (!paper_already_saved(citing_id)) {
         printf("Paper %s is not in %s. Add it first with option 3.\n",
@@ -447,4 +456,233 @@ int classify_citation(const Paper *citing, const Paper *cited,
     if (authors_are_complete(citing) && authors_are_complete(cited))
         return CITATION_CROSS;
     return CITATION_UNKNOWN;
+}
+
+/* ------------------------------------------------------------------
+ * Bibliographic Coupling (Paper A vs. Paper B reference overlap)
+ * ------------------------------------------------------------------ */
+
+#define REF_HASH_BUCKETS 1009
+
+typedef struct RefNode {
+    char work_id[PAPER_ID_LEN];
+    struct RefNode *next;
+} RefNode;
+
+typedef struct {
+    RefNode *buckets[REF_HASH_BUCKETS];
+} RefHash;
+
+static int is_valid_ref_id(const char *id)
+{
+    return id != NULL && id[0] != '\0' && strlen(id) < PAPER_ID_LEN;
+}
+
+static unsigned int ref_hash_bucket(const char *id)
+{
+    unsigned int h = 0;
+    const unsigned char *p;
+
+    for (p = (const unsigned char *)id; *p != '\0'; p++)
+        h = h * 31u + (unsigned int)(*p);
+    return h % (unsigned int)REF_HASH_BUCKETS;
+}
+
+static void ref_hash_init(RefHash *ht)
+{
+    int i;
+
+    for (i = 0; i < REF_HASH_BUCKETS; i++)
+        ht->buckets[i] = NULL;
+}
+
+static int ref_hash_contains(const RefHash *ht, const char *id)
+{
+    const RefNode *node = ht->buckets[ref_hash_bucket(id)];
+
+    while (node != NULL) {
+        if (strcmp(node->work_id, id) == 0)
+            return 1;
+        node = node->next;
+    }
+    return 0;
+}
+
+static int ref_hash_insert(RefHash *ht, const char *id, int *is_new)
+{
+    unsigned int idx;
+    RefNode *node;
+
+    *is_new = 0;
+    if (!is_valid_ref_id(id))
+        return 1;
+    if (ref_hash_contains(ht, id))
+        return 1;
+
+    node = malloc(sizeof(RefNode));
+    if (node == NULL)
+        return 0;
+
+    snprintf(node->work_id, PAPER_ID_LEN, "%s", id);
+    idx = ref_hash_bucket(id);
+    node->next = ht->buckets[idx];
+    ht->buckets[idx] = node;
+    *is_new = 1;
+    return 1;
+}
+
+static void ref_hash_free(RefHash *ht)
+{
+    int i;
+    RefNode *node;
+    RefNode *next;
+
+    for (i = 0; i < REF_HASH_BUCKETS; i++) {
+        node = ht->buckets[i];
+        while (node != NULL) {
+            next = node->next;
+            free(node);
+            node = next;
+        }
+        ht->buckets[i] = NULL;
+    }
+}
+
+static int populate_ref_hash(RefHash *ht, const Paper *p, int *unique_count)
+{
+    int i;
+    int is_new;
+
+    *unique_count = 0;
+    for (i = 0; i < p->reference_count && i < PAPER_MAX_REFS; i++) {
+        const char *ref = p->references[i];
+        if (!is_valid_ref_id(ref) || strcmp(ref, p->paper_id) == 0)
+            continue;
+        if (!ref_hash_insert(ht, ref, &is_new))
+            return 0;
+        *unique_count += is_new;
+    }
+    return 1;
+}
+
+static int scan_common_refs(const RefHash *ht_a, RefHash *ht_b,
+                            const Paper *paper_b, CouplingResult *out)
+{
+    int i;
+    int is_new;
+
+    for (i = 0; i < paper_b->reference_count && i < PAPER_MAX_REFS; i++) {
+        const char *ref = paper_b->references[i];
+        if (!is_valid_ref_id(ref) || strcmp(ref, paper_b->paper_id) == 0)
+            continue;
+        if (!ref_hash_insert(ht_b, ref, &is_new))
+            return 0;
+        if (!is_new)
+            continue;
+        out->unique_refs_b++;
+        if (ref_hash_contains(ht_a, ref) && out->common_count < PAPER_MAX_REFS) {
+            snprintf(out->common_refs[out->common_count], PAPER_ID_LEN, "%s", ref);
+            out->common_count++;
+        }
+    }
+    return 1;
+}
+
+static void reset_coupling_result(CouplingResult *out)
+{
+    out->status = COUPLING_UNKNOWN;
+    out->unique_refs_a = 0;
+    out->unique_refs_b = 0;
+    out->common_count = 0;
+    out->union_count = 0;
+    out->jaccard_pct = 0.0;
+}
+
+int citation_compute_coupling(const Paper *paper_a, int refs_a_available,
+                              const Paper *paper_b, int refs_b_available,
+                              CouplingResult *out)
+{
+    RefHash ht_a;
+    RefHash ht_b;
+
+    if (out == NULL)
+        return COUPLING_UNKNOWN;
+    reset_coupling_result(out);
+
+    if (paper_a == NULL || paper_b == NULL ||
+        !is_valid_ref_id(paper_a->paper_id) || !is_valid_ref_id(paper_b->paper_id) ||
+        !refs_a_available || !refs_b_available)
+        return COUPLING_UNKNOWN;
+
+    ref_hash_init(&ht_a);
+    ref_hash_init(&ht_b);
+
+    if (!populate_ref_hash(&ht_a, paper_a, &out->unique_refs_a) ||
+        !scan_common_refs(&ht_a, &ht_b, paper_b, out)) {
+        ref_hash_free(&ht_a);
+        ref_hash_free(&ht_b);
+        reset_coupling_result(out);
+        return COUPLING_UNKNOWN;
+    }
+
+    ref_hash_free(&ht_a);
+    ref_hash_free(&ht_b);
+
+    out->union_count = out->unique_refs_a + out->unique_refs_b - out->common_count;
+    out->jaccard_pct = (out->union_count > 0)
+        ? ((double)out->common_count * 100.0 / (double)out->union_count)
+        : 0.0;
+    out->status = (out->common_count > 0) ? COUPLING_YES : COUPLING_NO;
+    return out->status;
+}
+
+static void print_coupling_report(const char *paper_a_id, const char *paper_b_id,
+                                  const CouplingResult *res)
+{
+    int i;
+
+    printf("\n========== BIBLIOGRAPHIC COUPLING ==========\n\n");
+    printf("Paper A: %s\n", paper_a_id);
+    printf("Paper B: %s\n", paper_b_id);
+
+    if (res->status == COUPLING_UNKNOWN) {
+        printf("Bibliographic Coupling: UNKNOWN\n");
+        return;
+    }
+
+    printf("Bibliographic Coupling: %s\n",
+           (res->status == COUPLING_YES) ? "YES" : "NO");
+    printf("Paper A Unique References: %d\n", res->unique_refs_a);
+    printf("Paper B Unique References: %d\n", res->unique_refs_b);
+    printf("Common References: %d\n", res->common_count);
+    printf("Union References: %d\n", res->union_count);
+    printf("Jaccard Similarity: %.2f%%\n", res->jaccard_pct);
+    for (i = 0; i < res->common_count; i++)
+        printf("Shared Reference: %s\n", res->common_refs[i]);
+}
+
+int compare_papers_coupling(const char *paper_a_id, const char *paper_b_id)
+{
+    static Paper paper_a;
+    static Paper paper_b;
+    CouplingResult res;
+    int refs_a = 0;
+    int refs_b = 0;
+    int code_a;
+    int code_b;
+
+    reset_coupling_result(&res);
+    if (!is_valid_ref_id(paper_a_id) || !is_valid_ref_id(paper_b_id)) {
+        printf("Invalid paper ID.\n");
+        return 0;
+    }
+
+    code_a = load_cited_paper(paper_a_id, &paper_a, &refs_a);
+    code_b = load_cited_paper(paper_b_id, &paper_b, &refs_b);
+
+    if (code_a == OPENALEX_OK && code_b == OPENALEX_OK)
+        citation_compute_coupling(&paper_a, refs_a, &paper_b, refs_b, &res);
+
+    print_coupling_report(paper_a_id, paper_b_id, &res);
+    return res.status != COUPLING_UNKNOWN;
 }

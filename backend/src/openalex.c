@@ -188,6 +188,8 @@ static int read_string(const char *p, char *out, size_t size)
         }
         append_bytes(out, &n, size, buf, len);
     }
+    if (*p != '"')
+        return 0;
     out[n] = '\0';
     return 1;
 }
@@ -260,8 +262,11 @@ static int is_safe_text(const char *s, const char *extra)
 
 static int is_valid_work_id(const char *id)
 {
-    size_t length = strlen(id);
+    size_t length;
 
+    if (id == NULL)
+        return 0;
+    length = strlen(id);
     if (id[0] != 'W' || length < 2 || length >= PAPER_ID_LEN)
         return 0;
     return strspn(id + 1, "0123456789") == length - 1;
@@ -317,13 +322,19 @@ static char *read_file(const char *path)
     return text;
 }
 
-static void id_from_url(const char *url, char *out, size_t size)
+static int id_from_url(const char *url, char *out, size_t size)
 {
-    const char *slash = strrchr(url, '/');
-    const char *id = (slash != NULL) ? slash + 1 : url;
+    const char *slash;
+    const char *id;
 
-    strncpy(out, id, size - 1);
-    out[size - 1] = '\0';
+    if (url == NULL || out == NULL || size == 0)
+        return 0;
+    slash = strrchr(url, '/');
+    id = (slash != NULL) ? slash + 1 : url;
+    if (id[0] == '\0' || strlen(id) >= size)
+        return 0;
+    snprintf(out, size, "%s", id);
+    return 1;
 }
 
 static int read_id(const char *value, char *id, size_t size)
@@ -332,8 +343,7 @@ static int read_id(const char *value, char *id, size_t size)
 
     if (!read_text(value, url, sizeof(url)))
         return 0;
-    id_from_url(url, id, size);
-    return 1;
+    return id_from_url(url, id, size);
 }
 
 static int add_author_from_json(const char *authorship, Paper *p)
@@ -344,7 +354,8 @@ static int add_author_from_json(const char *authorship, Paper *p)
 
     if (author == NULL)
         return 1;
-    read_id(find_key(author, "id"), id, sizeof(id));
+    if (!read_id(find_key(author, "id"), id, sizeof(id)))
+        return 1;
     if (!read_text(find_key(author, "display_name"), name, sizeof(name)))
         return 1;
     return paper_add_author(p, id, name);
@@ -369,7 +380,8 @@ static void parse_references(const char *json, Paper *p)
     char id[PAPER_ID_LEN];
 
     while (item != NULL && *item == '"') {
-        if (read_id(item, id, sizeof(id)) && !paper_add_reference(p, id)) {
+        if (read_id(item, id, sizeof(id)) && is_valid_work_id(id) &&
+            !paper_add_reference(p, id)) {
             printf("Note: only the first %d referenced works are stored.\n", PAPER_MAX_REFS);
             return;
         }
@@ -381,23 +393,26 @@ static void read_doi(const char *root, const char *input_doi, char *doi, size_t 
 {
     char url[256];
 
-    strncpy(doi, input_doi, size - 1);
-    doi[size - 1] = '\0';
+    snprintf(doi, size, "%s", (input_doi != NULL) ? input_doi : "");
     if (!read_text(find_key(root, "doi"), url, sizeof(url)))
         return;
-    strncpy(doi, strip_doi_prefix(url), size - 1);
-    doi[size - 1] = '\0';
+    snprintf(doi, size, "%s", strip_doi_prefix(url));
 }
 
-static int parse_work(const char *json, const char *input_doi, Paper *out)
+int openalex_parse_work(const char *json, const char *input_doi, Paper *out)
 {
-    const char *root = skip_ws(json);
+    const char *root;
     const char *year_value;
     char id[PAPER_ID_LEN] = "";
     char title[PAPER_TITLE_LEN] = "(no title)";
     char doi[PAPER_DOI_LEN];
 
-    if (*root != '{' || !read_id(find_key(root, "id"), id, sizeof(id)))
+    if (json == NULL || out == NULL)
+        return OPENALEX_ERR_PARSE;
+
+    root = skip_ws(json);
+    if (*root != '{' || !read_id(find_key(root, "id"), id, sizeof(id)) ||
+        !is_valid_work_id(id))
         return OPENALEX_ERR_PARSE;
 
     read_text(find_key(root, "title"), title, sizeof(title));
@@ -426,7 +441,7 @@ static int fetch_url(const char *url, const char *fallback_doi, Paper *out)
     if (json == NULL)
         return OPENALEX_ERR_READ;
 
-    code = parse_work(json, fallback_doi, out);
+    code = openalex_parse_work(json, fallback_doi, out);
     free(json);
     return code;
 }
@@ -434,6 +449,9 @@ static int fetch_url(const char *url, const char *fallback_doi, Paper *out)
 int openalex_fetch_by_doi(const char *doi, Paper *out)
 {
     char url[URL_SIZE];
+
+    if (doi == NULL || out == NULL)
+        return OPENALEX_ERR_BAD_DOI;
 
     doi = strip_doi_prefix(doi);
     if (!is_safe_text(doi, "-._;()/:"))
@@ -449,7 +467,7 @@ int openalex_fetch_by_id(const char *work_id, Paper *out)
 {
     char url[URL_SIZE];
 
-    if (!is_valid_work_id(work_id))
+    if (out == NULL || !is_valid_work_id(work_id))
         return OPENALEX_ERR_BAD_ID;
 
     snprintf(url, sizeof(url), "%s%s%s", API_BASE, work_id, ID_FIELDS);

@@ -4,13 +4,25 @@
 
 static void copy_string(char *dest, const char *src, size_t size)
 {
-    strncpy(dest, src, size - 1);
-    dest[size - 1] = '\0';
+    if (size == 0)
+        return;
+    if (src == NULL) {
+        dest[0] = '\0';
+        return;
+    }
+    snprintf(dest, size, "%s", src);
+}
+
+static int is_valid_paper_id(const char *id)
+{
+    return id != NULL && id[0] != '\0' && strlen(id) < PAPER_ID_LEN;
 }
 
 void paper_init(Paper *p, const char *id, const char *title, int year, const char *doi)
 {
-    copy_string(p->paper_id, id, PAPER_ID_LEN);
+    if (p == NULL)
+        return;
+    copy_string(p->paper_id, is_valid_paper_id(id) ? id : "", PAPER_ID_LEN);
     copy_string(p->title, title, PAPER_TITLE_LEN);
     p->year = year;
     copy_string(p->doi, doi, PAPER_DOI_LEN);
@@ -20,7 +32,9 @@ void paper_init(Paper *p, const char *id, const char *title, int year, const cha
 
 int paper_add_author(Paper *p, const char *author_id, const char *name)
 {
-    if (p->author_count >= PAPER_MAX_AUTHORS)
+    if (p == NULL || p->author_count < 0 || p->author_count >= PAPER_MAX_AUTHORS)
+        return 0;
+    if (!is_valid_paper_id(author_id))
         return 0;
     copy_string(p->author_ids[p->author_count], author_id, PAPER_ID_LEN);
     copy_string(p->authors[p->author_count], name, AUTHOR_NAME_LEN);
@@ -30,7 +44,9 @@ int paper_add_author(Paper *p, const char *author_id, const char *name)
 
 int paper_add_reference(Paper *p, const char *ref_id)
 {
-    if (p->reference_count >= PAPER_MAX_REFS)
+    if (p == NULL || p->reference_count < 0 || p->reference_count >= PAPER_MAX_REFS)
+        return 0;
+    if (!is_valid_paper_id(ref_id))
         return 0;
     copy_string(p->references[p->reference_count], ref_id, PAPER_ID_LEN);
     p->reference_count++;
