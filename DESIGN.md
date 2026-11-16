@@ -51,11 +51,11 @@ All label colors are at least 5.8:1 on white. SELF and RECIPROCAL are independen
 
 | Role | Size | Weight |
 |---|---|---|
-| App name | 1.125rem | 650 |
-| Paper title (serif) | 1.75rem, line-height 1.25 | 600 |
-| Section heading | 1.0625rem | 600 |
-| Body | 0.9375rem, line-height 1.6 | 400 |
-| Table text | 0.875rem | 400 |
+| App name | 1.375rem | 700 |
+| Paper title (serif) | 1.5–2.125rem, line-height 1.25 | 600 |
+| Section heading | 1.375–1.625rem | 650 |
+| Body | 1rem, line-height 1.6 | 400 |
+| Table text | 0.9375rem | 400 |
 | Metadata label | 0.75rem, sentence case | 600 |
 | Caption and hint | 0.8125rem | 400 |
 | Summary figure | 1.75rem, tabular numerals | 600 |
@@ -65,11 +65,11 @@ Work IDs and DOIs wrap anywhere (`overflow-wrap: anywhere`) so nothing is clippe
 ## Spacing, shape, layout
 
 - Scale: 4, 8, 12, 16, 24, 32, 40, 64 px.
-- Content column: `max-width: 960px`. Text blocks cap at about 68ch.
+- Workspace: up to 1280 px of content with fluid 16–48 px side gutters. Supporting prose uses a shorter measure.
 - Sections are separated by 64 px (32 px margin plus 32 px padding) and a hairline.
 - Radius: 4 px for controls, 6 px for panels. No pills, no shadows.
 - Minimum interactive target: 44 px.
-- Breakpoints: 600 px (single column, stacked controls) and 860 px (graph and detail panel side by side).
+- Breakpoints: 600 px for stacked mobile controls and 1080 px for the side-by-side graph and detail panel. The graph keeps its square SVG viewBox and caps at 680 px. The citation table scrolls within its own region on narrow screens.
 
 ## Components
 

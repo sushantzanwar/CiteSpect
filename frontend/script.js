@@ -515,7 +515,7 @@ function showHoverLabel(hoverGroup, x, y, text) {
 }
 
 function shouldShowGraphLabels(citedPapers, ringRadius, dotRadius) {
-  var renderedWidth = Math.min(graphContainer.clientWidth || 560, 560);
+  var renderedWidth = graphContainer.clientWidth || 560;
   var labelPx = 11 * renderedWidth / 600;
   if (labelPx < 9 || ringRadius > 190) {
     return false;

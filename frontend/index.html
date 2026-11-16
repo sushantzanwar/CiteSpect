@@ -17,11 +17,11 @@
     <div class="container topbar-inner">
       <div class="brand">
         <h1>CiteSpect</h1>
-        <span class="brand-sub">Research paper citation analysis</span>
+        <span class="brand-sub">Research Paper Citation Workspace</span>
       </div>
       <nav aria-label="Primary">
-        <a href="#search-section">Find a paper</a>
-        <a href="#coupling-section">Compare papers</a>
+        <a href="#search-section">Find a Paper</a>
+        <a href="#coupling-section">Compare Papers</a>
       </nav>
     </div>
   </header>
@@ -29,19 +29,22 @@
   <main id="main" class="container" tabindex="-1">
 
     <section id="search-section" class="section section-first" aria-labelledby="search-heading">
-      <h2 id="search-heading">Find a paper</h2>
-      <form id="search-form" novalidate>
-        <label for="doi-input">Paper DOI or OpenAlex Work ID</label>
-        <div class="form-row">
-          <input type="text" id="doi-input" name="doi" autocomplete="off"
-            placeholder="10.1038/nature14539 or W2919115771" aria-describedby="doi-hint">
-          <button type="submit" id="analyze-button">Analyze</button>
-        </div>
-        <p id="doi-hint" class="hint">Lists the papers it cites and classifies each citation. A DOI can also be
-          pasted as https://doi.org/10.1038/nature14539. A Work ID such as W2919115771 works for papers already
-          stored locally.</p>
-      </form>
-      <p id="status" class="status" role="status" aria-live="polite"></p>
+      <div class="search-intro">
+        <h2 id="search-heading" class="hero-title">Understand how research connects.</h2>
+        <p class="lead">Inspect cited references, detect self-citations and reciprocal links, or compare two papers by outgoing references and incoming citations.</p>
+      </div>
+      <div class="workspace-panel">
+        <form id="search-form" novalidate>
+          <label for="doi-input">Paper DOI or OpenAlex Work ID</label>
+          <div class="form-row">
+            <input type="text" id="doi-input" name="doi" autocomplete="off"
+              placeholder="10.1038/nature14539 or W2919115771" aria-describedby="doi-hint">
+            <button type="submit" id="analyze-button">Analyze</button>
+          </div>
+          <p id="doi-hint" class="hint">Paste a DOI (e.g. 10.1038/nature14539 or https://doi.org/10.1038/nature14539) or a locally cached OpenAlex Work ID (e.g. W2919115771).</p>
+        </form>
+        <p id="status" class="status" role="status" aria-live="polite"></p>
+      </div>
     </section>
 
     <section id="paper-section" class="section" aria-labelledby="paper-heading" hidden>
@@ -62,7 +65,8 @@
       <h2 id="table-heading">Citation details</h2>
       <p id="table-context" class="hint table-context"></p>
       <p id="table-empty" class="hint" hidden></p>
-      <div class="table-wrap">
+      <p class="hint table-scroll-hint">Scroll sideways to see all citation columns.</p>
+      <div class="table-wrap" role="region" aria-labelledby="table-heading" tabindex="0">
         <table id="citation-table">
           <caption class="visually-hidden">Each row is one paper cited by the analyzed paper</caption>
           <thead>
@@ -99,43 +103,47 @@
     </section>
 
     <section id="coupling-section" class="section" aria-labelledby="coupling-heading">
-      <h2 id="coupling-heading">Compare papers</h2>
-      <p id="comparison-method-hint" class="hint">
-        Two papers are bibliographically coupled when they cite one or more common references (A &rarr; R and
-        B &rarr; R). Jaccard similarity measures reference overlap, not research quality.
-      </p>
-      <form id="coupling-form" class="coupling-form" novalidate>
-        <div class="comparison-mode-row" role="radiogroup" aria-label="Comparison method">
-          <label class="mode-option">
-            <input type="radio" name="comparison_mode" id="mode-coupling" value="coupling" checked>
-            <span>Bibliographic Coupling (outgoing references)</span>
-          </label>
-          <label class="mode-option">
-            <input type="radio" name="comparison_mode" id="mode-cocitation" value="cocitation">
-            <span>Co-Citation (incoming citations)</span>
-          </label>
-        </div>
-        <div class="coupling-form-grid">
-          <div class="coupling-field">
-            <label for="coupling-paper-a">Paper A OpenAlex Work ID</label>
-            <input type="text" id="coupling-paper-a" name="paper_a" autocomplete="off"
-              placeholder="W2919115771">
+      <div class="section-header">
+        <h2 id="coupling-heading">Compare Papers</h2>
+        <p id="comparison-method-hint" class="hint section-lead">
+          Two papers are bibliographically coupled when they cite one or more common references (A &rarr; R and
+          B &rarr; R). Jaccard similarity measures reference overlap, not research quality.
+        </p>
+      </div>
+      <div class="workspace-panel">
+        <form id="coupling-form" class="coupling-form" novalidate>
+          <div class="comparison-mode-row" role="radiogroup" aria-label="Comparison method">
+            <label class="mode-option">
+              <input type="radio" name="comparison_mode" id="mode-coupling" value="coupling" checked>
+              <span>Bibliographic Coupling (outgoing references)</span>
+            </label>
+            <label class="mode-option">
+              <input type="radio" name="comparison_mode" id="mode-cocitation" value="cocitation">
+              <span>Co-Citation (incoming citations)</span>
+            </label>
           </div>
-          <div class="coupling-field">
-            <label for="coupling-paper-b">Paper B OpenAlex Work ID</label>
-            <input type="text" id="coupling-paper-b" name="paper_b" autocomplete="off"
-              placeholder="W1901616594">
+          <div class="coupling-form-grid">
+            <div class="coupling-field">
+              <label for="coupling-paper-a">Paper A OpenAlex Work ID</label>
+              <input type="text" id="coupling-paper-a" name="paper_a" autocomplete="off"
+                placeholder="W2919115771">
+            </div>
+            <div class="coupling-field">
+              <label for="coupling-paper-b">Paper B OpenAlex Work ID</label>
+              <input type="text" id="coupling-paper-b" name="paper_b" autocomplete="off"
+                placeholder="W1901616594">
+            </div>
+            <button type="submit" id="coupling-button">Compare</button>
           </div>
-          <button type="submit" id="coupling-button">Compare</button>
-        </div>
-      </form>
-      <p id="coupling-status" class="status" role="status" aria-live="polite"></p>
-      <div id="coupling-results" class="compare-results" hidden>
-        <div id="coupling-summary-grid" class="summary-grid"></div>
-        <dl id="coupling-details" class="details"></dl>
-        <div id="coupling-shared-wrap" hidden>
-          <h3 id="coupling-shared-heading">Shared references</h3>
-          <ul id="coupling-shared-list" class="link-list"></ul>
+        </form>
+        <p id="coupling-status" class="status" role="status" aria-live="polite"></p>
+        <div id="coupling-results" class="compare-results" hidden>
+          <div id="coupling-summary-grid" class="summary-grid"></div>
+          <dl id="coupling-details" class="details"></dl>
+          <div id="coupling-shared-wrap" hidden>
+            <h3 id="coupling-shared-heading">Shared references</h3>
+            <ul id="coupling-shared-list" class="link-list"></ul>
+          </div>
         </div>
       </div>
     </section>
