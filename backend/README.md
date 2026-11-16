@@ -6,6 +6,7 @@ A college FODS (Fundamentals of Data Structures) project written in **C99** with
 
 ```
 CiteSpect/
+├── DESIGN.md          Frontend visual system, tokens, typography, and motion rules
 ├── backend/
 │   ├── include/       C99 headers (paper.h, author_hash.h, citation_graph.h, citation_analysis.h, csv_store.h, openalex.h, config.h, paper_list.h)
 │   ├── src/           C99 implementation (main.c, paper.c, paper_list.c, author_hash.c, citation_graph.c, citation_analysis.c, csv_store.c, openalex.c, config.c)
@@ -18,7 +19,8 @@ CiteSpect/
     ├── index.html     UI layout, citation summary, and interactive graph container
     ├── script.js      API calls, citation table, comparison workflows, and SVG graph
     ├── style.css      Responsive styling and graph legend/highlighting
-    └── test_cocitation_ui.js  Node JS DOM integration tests for comparison workflows
+    ├── test_cocitation_ui.js  Node JS DOM integration tests for comparison workflows
+    └── test_redesign_ui.js    Node JS DOM presentation, adaptive graph, and a11y tests
 ```
 
 ## Core Algorithms & Data Structures
@@ -59,7 +61,7 @@ CiteSpect/
   - `POST /api/citation-analysis` — runs `citespect.exe` option 4 for a Work ID and returns structured JSON with per-citation classifications, shared authors, local titles, and summary counts.
   - `POST /api/coupling` — runs `citespect.exe --coupling <PAPER_A_ID> <PAPER_B_ID>` and returns structured JSON with coupling status (`YES` / `NO` / `UNKNOWN`), unique/common/union reference counts, Jaccard similarity percentage, and shared Work IDs with local titles.
   - `POST /api/cocitation` — runs `citespect.exe --cocitation <PAPER_A_ID> <PAPER_B_ID>` and returns structured JSON with co-citation status (`YES` / `NO` / `UNKNOWN`), `data_complete` flag, unique citing-paper counts, union count, exact Jaccard similarity (or `null` when incomplete), and common co-citing Work IDs with local titles.
-- `frontend/` renders:
+- `frontend/` (visual system documented in root `DESIGN.md`) renders:
   - A simplified 3-counter dashboard (`Total Citations`, `Self-Citations`, `Reciprocal Citations`) and citation details table with clear labels (`SELF`, `OTHER / UNCONFIRMED SELF`, `RECIPROCAL`, `ONE-WAY`, `UNVERIFIED`, `FETCH FAILED`).
   - An interactive SVG citation graph with directional arrowheads, color-coded nodes, legend, click and keyboard navigation (`Tab` / `Enter` / `Space`), and a node detail panel showing Work ID, title, SELF/reciprocal status, shared authors, and OpenAlex link.
   - A **Compare two papers** section with mode selection between **Bibliographic Coupling (outgoing references)** and **Co-Citation (incoming citations)**, clickable OpenAlex links for shared/co-citing Work IDs, and `UNVERIFIED` display when similarity cannot be reliably calculated.
@@ -107,7 +109,8 @@ Flask and frontend JavaScript integration tests (isolated via `tempfile.Temporar
 
 ```powershell
 python -m unittest -v bridge/test_app.py   # 14 Flask integration tests
-node frontend/test_cocitation_ui.js       # 6 frontend JS integration tests
+node frontend/test_cocitation_ui.js       # 6 Co-Citation frontend JS tests
+node frontend/test_redesign_ui.js         # 12 UI presentation & a11y JS tests
 ```
 
 ## Known Limitations

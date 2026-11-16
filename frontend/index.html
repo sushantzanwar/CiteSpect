@@ -4,30 +4,31 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>CiteSpect - Research Paper Citation Analysis System</title>
+  <title>CiteSpect - Research Paper Citation Analysis</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
-  <header class="site-header">
-    <div class="container">
-      <h1>CiteSpect</h1>
-      <p class="subtitle">Research Paper Citation Analysis System</p>
-      <p class="intro">
-        Enter a paper's DOI or OpenAlex Work ID to inspect the papers it cites.
-        CiteSpect detects <strong>Self-Citations</strong> (shared OpenAlex author IDs via a C99 Hash Table with Separate
-        Chaining), <strong>Reciprocal Cross-Citations</strong> (mutual citations A &rarr; B and B &rarr; A via
-        Adjacency-List Graph traversal), <strong>Bibliographic Coupling</strong> (shared outgoing references), and
-        <strong>Co-Citation</strong> (shared incoming citations).
-      </p>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="topbar">
+    <div class="container topbar-inner">
+      <div class="brand">
+        <h1>CiteSpect</h1>
+        <span class="brand-sub">Research paper citation analysis</span>
+      </div>
+      <nav aria-label="Primary">
+        <a href="#search-section">Find a paper</a>
+        <a href="#coupling-section">Compare papers</a>
+      </nav>
     </div>
   </header>
 
-  <main class="container">
+  <main id="main" class="container" tabindex="-1">
 
-    <section class="card" aria-labelledby="search-heading">
+    <section id="search-section" class="section section-first" aria-labelledby="search-heading">
       <h2 id="search-heading">Find a paper</h2>
       <form id="search-form" novalidate>
         <label for="doi-input">Paper DOI or OpenAlex Work ID</label>
@@ -36,52 +37,36 @@
             placeholder="10.1038/nature14539 or W2919115771" aria-describedby="doi-hint">
           <button type="submit" id="analyze-button">Analyze</button>
         </div>
-        <p id="doi-hint" class="hint">Example DOI: 10.1038/nature14539 (or https://doi.org/10.1038/nature14539) or
-          cached Work ID: W2919115771.</p>
+        <p id="doi-hint" class="hint">Lists the papers it cites and classifies each citation. A DOI can also be
+          pasted as https://doi.org/10.1038/nature14539. A Work ID such as W2919115771 works for papers already
+          stored locally.</p>
       </form>
       <p id="status" class="status" role="status" aria-live="polite"></p>
     </section>
 
-    <section id="paper-section" class="card" aria-labelledby="paper-heading" hidden>
-      <h2 id="paper-heading">Paper information</h2>
-      <dl id="paper-details" class="details"></dl>
-      <h3 id="authors-heading">Authors</h3>
+    <section id="paper-section" class="section" aria-labelledby="paper-heading" hidden>
+      <h2 id="paper-heading" class="paper-title"></h2>
+      <dl id="paper-details" class="paper-meta"></dl>
+      <h3 id="authors-heading" class="meta-label">Authors</h3>
       <ul id="author-list" class="author-list"></ul>
     </section>
 
-    <section id="analysis-section" class="card" aria-labelledby="analysis-heading" hidden>
-      <h2 id="analysis-heading">Citation analysis summary</h2>
+    <section id="analysis-section" class="section" aria-labelledby="analysis-heading" hidden>
+      <h2 id="analysis-heading">Citation summary</h2>
       <p id="analysis-message" class="status"></p>
       <div id="summary-grid" class="summary-grid"></div>
-
-      <h3>What the categories mean</h3>
-      <dl class="definitions">
-        <dt>Self-Citation (SELF)</dt>
-        <dd>Two papers share at least one author.</dd>
-        <dt>Reciprocal Citation (RECIPROCAL)</dt>
-        <dd>Two papers cite each other.</dd>
-        <dt>One-Way Citation (ONE-WAY)</dt>
-        <dd>A reverse citation was not found in the verified reference data.</dd>
-        <dt>Unverified (UNVERIFIED)</dt>
-        <dd>Required metadata is unavailable.</dd>
-        <dt>Other / Unconfirmed Self (OTHER / UNCONFIRMED SELF)</dt>
-        <dd>No shared author was established.</dd>
-      </dl>
-      <p class="hint">
-        <strong>SELF</strong> and <strong>RECIPROCAL</strong> are independent properties, so one citation can belong to
-        both categories.
-      </p>
+      <p class="hint">SELF and RECIPROCAL are independent properties, so one citation can carry both labels.</p>
     </section>
 
-    <section id="table-section" class="card" aria-labelledby="table-heading" hidden>
+    <section id="table-section" class="section" aria-labelledby="table-heading" hidden>
       <h2 id="table-heading">Citation details</h2>
+      <p id="table-context" class="hint table-context"></p>
       <p id="table-empty" class="hint" hidden></p>
       <div class="table-wrap">
         <table id="citation-table">
           <caption class="visually-hidden">Each row is one paper cited by the analyzed paper</caption>
           <thead>
             <tr>
-              <th scope="col">Citing paper</th>
               <th scope="col">Cited paper</th>
               <th scope="col">Self-citation</th>
               <th scope="col">Reciprocal citation</th>
@@ -93,17 +78,17 @@
       </div>
     </section>
 
-    <section id="graph-section" class="card" aria-labelledby="graph-heading" hidden>
+    <section id="graph-section" class="section" aria-labelledby="graph-heading" hidden>
       <h2 id="graph-heading">Citation relationships</h2>
       <p class="hint">
         The center is the analyzed paper. Arrows point from the citing paper toward each cited paper.
-        Click or select any cited-paper node (Tab + Enter/Space) to inspect its details.
+        Select any cited-paper node (click, or Tab then Enter or Space) to inspect it.
       </p>
       <div class="graph-layout">
         <div id="graph-container"></div>
         <aside id="graph-node-panel" class="node-panel" aria-live="polite" hidden>
           <div class="node-panel-header">
-            <h3 id="node-panel-title">Selected cited paper</h3>
+            <h3 id="node-panel-title" tabindex="-1">Selected cited paper</h3>
             <button type="button" id="node-panel-close" class="node-panel-close"
               aria-label="Clear selected node">&times;</button>
           </div>
@@ -113,8 +98,8 @@
       <ul id="graph-legend" class="legend"></ul>
     </section>
 
-    <section id="coupling-section" class="card" aria-labelledby="coupling-heading">
-      <h2 id="coupling-heading">Compare two papers</h2>
+    <section id="coupling-section" class="section" aria-labelledby="coupling-heading">
+      <h2 id="coupling-heading">Compare papers</h2>
       <p id="comparison-method-hint" class="hint">
         Two papers are bibliographically coupled when they cite one or more common references (A &rarr; R and
         B &rarr; R). Jaccard similarity measures reference overlap, not research quality.
@@ -145,15 +130,53 @@
         </div>
       </form>
       <p id="coupling-status" class="status" role="status" aria-live="polite"></p>
-      <div id="coupling-results" hidden>
+      <div id="coupling-results" class="compare-results" hidden>
         <div id="coupling-summary-grid" class="summary-grid"></div>
         <dl id="coupling-details" class="details"></dl>
         <div id="coupling-shared-wrap" hidden>
           <h3 id="coupling-shared-heading">Shared references</h3>
-          <ul id="coupling-shared-list" class="author-list"></ul>
+          <ul id="coupling-shared-list" class="link-list"></ul>
         </div>
       </div>
     </section>
+
+    <details id="about-section" class="about">
+      <summary>About these analyses</summary>
+      <div class="about-body">
+        <h3>What the labels mean</h3>
+        <dl class="definitions">
+          <dt>SELF</dt>
+          <dd>The citing and cited papers share at least one OpenAlex author ID.</dd>
+          <dt>RECIPROCAL</dt>
+          <dd>The two papers cite each other.</dd>
+          <dt>ONE-WAY</dt>
+          <dd>A reverse citation was not found in the verified reference data.</dd>
+          <dt>OTHER / UNCONFIRMED SELF</dt>
+          <dd>No shared author was established. This is not proof that no author overlaps.</dd>
+          <dt>UNVERIFIED</dt>
+          <dd>Required data is unavailable, so the result is not guessed.</dd>
+          <dt>FETCH FAILED</dt>
+          <dd>Metadata for the cited paper could not be retrieved from OpenAlex.</dd>
+        </dl>
+        <h3>How each analysis works</h3>
+        <dl class="definitions">
+          <dt>Self-citation</dt>
+          <dd>Author IDs of the citing paper go into a hash table with separate chaining (C99). Each cited paper's
+            author IDs are looked up in it.</dd>
+          <dt>Reciprocal citation</dt>
+          <dd>The cited paper's references are stored as an adjacency list. A reverse edge to the citing paper
+            confirms a mutual citation.</dd>
+          <dt>Bibliographic coupling</dt>
+          <dd>Two papers that cite at least one common reference. Reference sets are compared with a hash table, and
+            similarity is the Jaccard index of the two sets.</dd>
+          <dt>Co-citation</dt>
+          <dd>Third-party papers that cite both A and B, using incoming citations from OpenAlex and the local
+            cache. A similarity percentage is shown only when both citing lists are complete.</dd>
+          <dt>Data source</dt>
+          <dd>Citation data comes from OpenAlex and is cached locally in CSV files.</dd>
+        </dl>
+      </div>
+    </details>
 
   </main>
 

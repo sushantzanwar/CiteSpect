@@ -14,24 +14,24 @@ var SELF_BADGE_INFO = {
   "SELF": { text: "SELF", cssClass: "type-self" },
   "NOT IDENTIFIED AS SELF": { text: "OTHER / UNCONFIRMED SELF", cssClass: "type-not-self" },
   "FAILED": { text: "FETCH FAILED", cssClass: "type-failed" },
-  "PENDING": { text: "PENDING", cssClass: "type-failed" }
+  "PENDING": { text: "PENDING", cssClass: "type-pending" }
 };
 
 var RECIP_BADGE_INFO = {
   "CONFIRMED RECIPROCAL": { text: "RECIPROCAL", cssClass: "type-reciprocal" },
   "NOT RECIPROCAL": { text: "ONE-WAY", cssClass: "type-not-reciprocal" },
   "UNKNOWN": { text: "UNVERIFIED", cssClass: "type-unknown" },
-  "PENDING": { text: "PENDING", cssClass: "type-failed" }
+  "PENDING": { text: "PENDING", cssClass: "type-pending" }
 };
 
 var GRAPH_TYPE_INFO = {
-  SELF_RECIPROCAL: { text: "SELF + RECIPROCAL", legend: "Self & Reciprocal", color: "#5b21b6", cssClass: "type-reciprocal" },
-  SELF: { text: "SELF", legend: "Self-Citation", color: "#0b5a54", cssClass: "type-self" },
-  RECIPROCAL: { text: "RECIPROCAL", legend: "Reciprocal Citation", color: "#1d4ed8", cssClass: "type-reciprocal" },
-  NOT_SELF: { text: "OTHER / UNCONFIRMED SELF", legend: "Other / Unconfirmed Self (One-Way)", color: "#14284b", cssClass: "type-not-self" },
-  UNKNOWN: { text: "UNVERIFIED", legend: "Unverified", color: "#a15c07", cssClass: "type-unknown" },
-  FAILED: { text: "FETCH FAILED", legend: "Metadata retrieval failed", color: "#5f6b7a", cssClass: "type-failed" },
-  PENDING: { text: "PENDING", legend: "Cited paper (pending analysis)", color: "#4a5a78", cssClass: "" }
+  SELF_RECIPROCAL: { text: "SELF + RECIPROCAL", legend: "Self and reciprocal", color: "#246B57", ring: "#2B5C9E", cssClass: "type-reciprocal" },
+  SELF: { text: "SELF", legend: "Self-citation", color: "#246B57", cssClass: "type-self" },
+  RECIPROCAL: { text: "RECIPROCAL", legend: "Reciprocal citation", color: "#2B5C9E", cssClass: "type-reciprocal" },
+  NOT_SELF: { text: "OTHER / UNCONFIRMED SELF", legend: "Other / unconfirmed self (one-way)", color: "#5A645D", cssClass: "type-not-self" },
+  UNKNOWN: { text: "UNVERIFIED", legend: "Unverified", color: "#8A5A00", cssClass: "type-unknown" },
+  FAILED: { text: "FETCH FAILED", legend: "Metadata retrieval failed", color: "#A23B2F", cssClass: "type-failed" },
+  PENDING: { text: "PENDING", legend: "Cited paper (pending analysis)", color: "#8A938C", cssClass: "" }
 };
 
 var SUMMARY_ITEMS = [
@@ -46,6 +46,7 @@ var analyzeButton = document.getElementById("analyze-button");
 var statusLine = document.getElementById("status");
 
 var paperSection = document.getElementById("paper-section");
+var paperHeading = document.getElementById("paper-heading");
 var paperDetails = document.getElementById("paper-details");
 var authorsHeading = document.getElementById("authors-heading");
 var authorList = document.getElementById("author-list");
@@ -55,6 +56,7 @@ var analysisMessage = document.getElementById("analysis-message");
 var summaryGrid = document.getElementById("summary-grid");
 
 var tableSection = document.getElementById("table-section");
+var tableContext = document.getElementById("table-context");
 var tableEmpty = document.getElementById("table-empty");
 var citationRows = document.getElementById("citation-rows");
 
@@ -62,6 +64,7 @@ var graphSection = document.getElementById("graph-section");
 var graphContainer = document.getElementById("graph-container");
 var graphLegend = document.getElementById("graph-legend");
 var nodePanel = document.getElementById("graph-node-panel");
+var nodePanelTitle = document.getElementById("node-panel-title");
 var nodePanelDetails = document.getElementById("node-panel-details");
 var nodePanelClose = document.getElementById("node-panel-close");
 
@@ -83,6 +86,54 @@ var modeCocitationRadio = document.getElementById("mode-cocitation");
 var isBusy = false;
 var isCouplingBusy = false;
 var selectedGraphState = null;
+var lastGraph = null;
+var AUTHORS_COLLAPSED = 8;
+
+
+function prefersReducedMotion() {
+  try {
+    return typeof window !== "undefined" && typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  } catch (error) {
+    return true;
+  }
+}
+
+function animateIn(element, rise, duration) {
+  if (!element || typeof element.animate !== "function" || prefersReducedMotion()) {
+    return;
+  }
+  try {
+    element.animate(
+      [
+        { opacity: 0, transform: "translateY(" + rise + "px)" },
+        { opacity: 1, transform: "translateY(0)" }
+      ],
+      { duration: duration, easing: "ease-out" }
+    );
+  } catch (error) {
+    // The content is already visible; animation is optional.
+  }
+}
+
+function fadeIn(element, duration) {
+  if (!element || typeof element.animate !== "function" || prefersReducedMotion()) {
+    return;
+  }
+  try {
+    element.animate([{ opacity: 0 }, { opacity: 1 }], { duration: duration, easing: "ease-out" });
+  } catch (error) {
+    // The content is already visible; animation is optional.
+  }
+}
+
+function reveal(element, rise, duration) {
+  var wasHidden = element.hidden;
+  element.hidden = false;
+  if (wasHidden) {
+    animateIn(element, rise, duration);
+  }
+}
 
 
 function showStatus(element, message, kind) {
@@ -155,33 +206,77 @@ function textNode(text) {
   return document.createTextNode(String(text));
 }
 
-function showPaper(paper) {
-  paperDetails.innerHTML = "";
+function addMetaTo(container, label, valueNode) {
+  var group = document.createElement("div");
+  var term = document.createElement("dt");
+  term.textContent = label;
+  var description = document.createElement("dd");
+  description.appendChild(valueNode);
+  group.appendChild(term);
+  group.appendChild(description);
+  container.appendChild(group);
+}
+
+function showAuthors(authors) {
   authorList.innerHTML = "";
-
-  if (paper.title) {
-    addDetailTo(paperDetails, "Title", textNode(paper.title));
-  }
-  if (Number.isInteger(paper.year) && paper.year > 0) {
-    addDetailTo(paperDetails, "Publication year", textNode(paper.year));
-  }
-  if (paper.doi) {
-    addDetailTo(paperDetails, "DOI", textNode(paper.doi));
-  }
-  addDetailTo(paperDetails, "OpenAlex Work ID", makeIdNode(paper.paper_id));
-  if (Number.isInteger(paper.reference_count)) {
-    addDetailTo(paperDetails, "References", textNode(paper.reference_count));
-  }
-
-  var authors = Array.isArray(paper.authors) ? paper.authors : [];
   authorsHeading.hidden = authors.length === 0;
-  authors.forEach(function (name) {
+
+  var collapsed = authors.length > AUTHORS_COLLAPSED + 1;
+  var extraItems = [];
+
+  authors.forEach(function (name, index) {
     var item = document.createElement("li");
     item.textContent = name;
+    if (collapsed && index >= AUTHORS_COLLAPSED) {
+      item.hidden = true;
+      extraItems.push(item);
+    }
     authorList.appendChild(item);
   });
 
-  paperSection.hidden = false;
+  if (!collapsed) {
+    return;
+  }
+
+  var moreItem = document.createElement("li");
+  moreItem.className = "author-more";
+  var toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "link-button";
+  toggle.setAttribute("aria-expanded", "false");
+  var hiddenCount = authors.length - AUTHORS_COLLAPSED;
+  toggle.textContent = "and " + hiddenCount + " more authors";
+  toggle.addEventListener("click", function () {
+    var expand = toggle.getAttribute("aria-expanded") !== "true";
+    extraItems.forEach(function (item) {
+      item.hidden = !expand;
+    });
+    toggle.setAttribute("aria-expanded", expand ? "true" : "false");
+    toggle.textContent = expand ? "show fewer authors" : "and " + hiddenCount + " more authors";
+  });
+  moreItem.appendChild(toggle);
+  authorList.appendChild(moreItem);
+}
+
+function showPaper(paper) {
+  paperDetails.innerHTML = "";
+
+  paperHeading.textContent = paper.title || paper.paper_id || "Untitled paper";
+
+  if (Number.isInteger(paper.year) && paper.year > 0) {
+    addMetaTo(paperDetails, "Year", textNode(paper.year));
+  }
+  if (paper.doi) {
+    addMetaTo(paperDetails, "DOI", textNode(paper.doi));
+  }
+  addMetaTo(paperDetails, "OpenAlex Work ID", makeIdNode(paper.paper_id));
+  if (Number.isInteger(paper.reference_count)) {
+    addMetaTo(paperDetails, "References", textNode(paper.reference_count));
+  }
+
+  showAuthors(Array.isArray(paper.authors) ? paper.authors : []);
+
+  reveal(paperSection, 6, 220);
 }
 
 
@@ -261,18 +356,24 @@ function makeNotesCell(citation) {
     parts.push("Cited paper reference list unavailable");
   }
 
-  cell.textContent = parts.length > 0 ? parts.join(" | ") : "\u2014";
+  cell.textContent = parts.length > 0 ? parts.join(" | ") : "None";
+  return cell;
+}
+
+function makeCitedCell(citation) {
+  var cell = document.createElement("td");
+  cell.appendChild(makeIdNode(citation.cited));
+  if (citation.cited_title) {
+    var title = document.createElement("span");
+    title.className = "cell-title";
+    title.textContent = citation.cited_title;
+    cell.appendChild(title);
+  }
   return cell;
 }
 
 function makeCitationRow(citation) {
   var row = document.createElement("tr");
-
-  var citingCell = document.createElement("td");
-  citingCell.appendChild(makeIdNode(citation.citing));
-
-  var citedCell = document.createElement("td");
-  citedCell.appendChild(makeIdNode(citation.cited));
 
   var selfCell = document.createElement("td");
   selfCell.appendChild(makeSelfBadge(citation.self_citation));
@@ -280,8 +381,7 @@ function makeCitationRow(citation) {
   var recipCell = document.createElement("td");
   recipCell.appendChild(makeRecipBadge(citation.reciprocal_citation));
 
-  row.appendChild(citingCell);
-  row.appendChild(citedCell);
+  row.appendChild(makeCitedCell(citation));
   row.appendChild(selfCell);
   row.appendChild(recipCell);
   row.appendChild(makeNotesCell(citation));
@@ -297,7 +397,7 @@ function showTable(citations, emptyMessage) {
   document.querySelector(".table-wrap").hidden = citations.length === 0;
   tableEmpty.hidden = citations.length > 0;
   tableEmpty.textContent = emptyMessage;
-  tableSection.hidden = false;
+  reveal(tableSection, 6, 220);
 }
 
 
@@ -315,15 +415,15 @@ function createArrowMarker(id, fillColor) {
     viewBox: "0 0 10 10",
     refX: "8",
     refY: "5",
-    markerWidth: "6",
-    markerHeight: "6",
+    markerWidth: "7",
+    markerHeight: "7",
     orient: "auto-start-reverse"
   });
   marker.appendChild(svgElement("path", { d: "M 0 1.5 L 8.5 5 L 0 8.5 z", fill: fillColor }));
   return marker;
 }
 
-function clearNodeSelection() {
+function clearSelectionStyles() {
   if (selectedGraphState) {
     selectedGraphState.nodeGroup.classList.remove("is-selected");
     selectedGraphState.nodeGroup.setAttribute("aria-pressed", "false");
@@ -331,8 +431,20 @@ function clearNodeSelection() {
     selectedGraphState.edgeLine.setAttribute("marker-end", "url(#arrow-default)");
     selectedGraphState = null;
   }
+}
+
+function clearNodeSelection() {
+  clearSelectionStyles();
   nodePanelDetails.innerHTML = "";
   nodePanel.hidden = true;
+}
+
+function closeNodePanel() {
+  var previousNode = selectedGraphState ? selectedGraphState.nodeGroup : null;
+  clearNodeSelection();
+  if (previousNode && typeof previousNode.focus === "function") {
+    previousNode.focus();
+  }
 }
 
 function showNodePanel(cited) {
@@ -359,20 +471,32 @@ function showNodePanel(cited) {
     addDetailTo(nodePanelDetails, "OpenAlex", extLink);
   }
 
-  nodePanel.hidden = false;
+  reveal(nodePanel, 8, 200);
 }
 
-function selectGraphNode(state) {
+function focusNodePanel() {
+  if (nodePanelTitle && typeof nodePanelTitle.focus === "function") {
+    nodePanelTitle.focus();
+  }
+}
+
+function selectGraphNode(state, viaKeyboard) {
   if (selectedGraphState && selectedGraphState.nodeGroup === state.nodeGroup) {
+    if (viaKeyboard) {
+      focusNodePanel();
+    }
     return;
   }
-  clearNodeSelection();
+  clearSelectionStyles();
   selectedGraphState = state;
   state.nodeGroup.classList.add("is-selected");
   state.nodeGroup.setAttribute("aria-pressed", "true");
   state.edgeLine.classList.add("is-selected");
   state.edgeLine.setAttribute("marker-end", "url(#arrow-active)");
   showNodePanel(state.cited);
+  if (viaKeyboard) {
+    focusNodePanel();
+  }
 }
 
 function showHoverLabel(hoverGroup, x, y, text) {
@@ -390,22 +514,39 @@ function showHoverLabel(hoverGroup, x, y, text) {
   hoverGroup.removeAttribute("hidden");
 }
 
+function shouldShowGraphLabels(citedPapers, ringRadius, dotRadius) {
+  var renderedWidth = Math.min(graphContainer.clientWidth || 560, 560);
+  var labelPx = 11 * renderedWidth / 600;
+  if (labelPx < 9 || ringRadius > 190) {
+    return false;
+  }
+  var longest = 0;
+  citedPapers.forEach(function (cited) {
+    longest = Math.max(longest, String(cited.id).length);
+  });
+  var labelWidth = longest * 6.4 + 10;
+  var circumference = 2 * Math.PI * (ringRadius + dotRadius + 10);
+  return citedPapers.length * labelWidth <= circumference;
+}
+
 function drawGraph(centerId, citedPapers) {
   var size = 600;
   var middle = size / 2;
   var centerRadius = 24;
   var ringRadius = citedPapers.length <= 16 ? 190 : 225;
   var dotRadius = citedPapers.length > 40 ? 6 : 8;
-  var showAllLabels = citedPapers.length <= 16;
 
   clearNodeSelection();
+  reveal(graphSection, 6, 220);
+  var showAllLabels = shouldShowGraphLabels(citedPapers, ringRadius, dotRadius);
+  lastGraph = { centerId: centerId, citedPapers: citedPapers, labelsShown: showAllLabels };
 
   var svg = svgElement("svg", { viewBox: "0 0 " + size + " " + size, role: "img" });
   svg.setAttribute("aria-label", centerId + " cites " + citedPapers.length + " papers. Select any cited node to view details.");
 
   var defs = svgElement("defs", {});
-  defs.appendChild(createArrowMarker("arrow-default", "#8a99ad"));
-  defs.appendChild(createArrowMarker("arrow-active", "#14284b"));
+  defs.appendChild(createArrowMarker("arrow-default", "#8A938C"));
+  defs.appendChild(createArrowMarker("arrow-active", "#202420"));
   svg.appendChild(defs);
 
   var edgesLayer = svgElement("g", { class: "graph-edges" });
@@ -452,8 +593,13 @@ function drawGraph(centerId, citedPapers) {
       "aria-label": cited.id + " - Self-citation: " + selfInfo.text + ", Reciprocal: " + recipInfo.text
     });
 
+    var dotAttributes = { cx: x, cy: y, r: dotRadius, fill: info.color, class: "graph-node-dot" };
+    if (info.ring) {
+      dotAttributes.stroke = info.ring;
+      dotAttributes["stroke-width"] = 3;
+    }
     nodeGroup.appendChild(svgElement("circle", { cx: x, cy: y, r: dotRadius + 5, class: "graph-node-halo" }));
-    nodeGroup.appendChild(svgElement("circle", { cx: x, cy: y, r: dotRadius, fill: info.color, class: "graph-node-dot" }));
+    nodeGroup.appendChild(svgElement("circle", dotAttributes));
 
     var tip = svgElement("title", {});
     tip.textContent = cited.id + (cited.title ? " (" + cited.title + ")" : "") + (info.text ? " [" + info.text + "]" : "");
@@ -471,12 +617,12 @@ function drawGraph(centerId, citedPapers) {
 
     var state = { nodeGroup: nodeGroup, edgeLine: edgeLine, cited: cited };
     nodeGroup.addEventListener("click", function () {
-      selectGraphNode(state);
+      selectGraphNode(state, false);
     });
     nodeGroup.addEventListener("keydown", function (event) {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
-        selectGraphNode(state);
+        selectGraphNode(state, true);
       }
     });
     if (!showAllLabels) {
@@ -497,8 +643,8 @@ function drawGraph(centerId, citedPapers) {
     nodesLayer.appendChild(nodeGroup);
   });
 
-  svg.appendChild(svgElement("circle", { cx: middle, cy: middle, r: centerRadius, fill: "#14284b" }));
-  var centerLabel = svgElement("text", { x: middle, y: middle + 42, "text-anchor": "middle", "font-size": 15, "font-weight": 600, fill: "#14284b" });
+  svg.appendChild(svgElement("circle", { cx: middle, cy: middle, r: centerRadius, fill: "#202420" }));
+  var centerLabel = svgElement("text", { x: middle, y: middle + 42, "text-anchor": "middle", "font-size": 15, "font-weight": 600, fill: "#202420" });
   centerLabel.textContent = centerId;
   svg.appendChild(centerLabel);
 
@@ -509,7 +655,6 @@ function drawGraph(centerId, citedPapers) {
   graphContainer.innerHTML = "";
   graphContainer.appendChild(svg);
   showLegend(usedTypes);
-  graphSection.hidden = false;
 }
 
 function showLegend(usedTypes) {
@@ -520,6 +665,9 @@ function showLegend(usedTypes) {
     var swatch = document.createElement("span");
     swatch.className = "swatch";
     swatch.style.background = info.color;
+    if (info.ring) {
+      swatch.style.border = "2px solid " + info.ring;
+    }
     item.appendChild(swatch);
     item.appendChild(textNode(info.legend));
     graphLegend.appendChild(item);
@@ -540,6 +688,7 @@ function resetResults() {
   analysisSection.hidden = true;
   tableSection.hidden = true;
   graphSection.hidden = true;
+  lastGraph = null;
   summaryGrid.innerHTML = "";
   citationRows.innerHTML = "";
   clearNodeSelection();
@@ -575,12 +724,16 @@ function showAnalysis(analysis, paper) {
 
   if (analysis.message) {
     showStatus(analysisMessage, analysis.message, "");
+    tableContext.textContent = "";
     showTable([], emptyTableMessage(paper));
     return;
   }
 
   showStatus(analysisMessage, "", "");
   showSummary(analysis.summary || {});
+  tableContext.textContent = citations.length > 0
+    ? "Papers cited by " + paper.paper_id + ": " + citations.length + " records."
+    : "";
   showTable(citations, "No citation records are available for this paper.");
   if (citations.length > 0) {
     drawGraph(paper.paper_id, citations.map(function (citation) {
@@ -600,7 +753,7 @@ function showAnalysis(analysis, paper) {
 
 async function runAnalysis(paper) {
   showStatus(statusLine, "Step 2 of 2: analyzing citations (Self-Citation Hash Table & Reciprocal Graph Search)...", "working");
-  analysisSection.hidden = false;
+  reveal(analysisSection, 6, 220);
   showStatus(analysisMessage, "Analyzing citations...", "working");
 
   try {
@@ -679,6 +832,7 @@ function updateComparisonMethodHint() {
   }
   couplingResults.hidden = true;
   showStatus(couplingStatus, "", "");
+  fadeIn(comparisonMethodHint, 160);
 }
 
 function showCouplingResult(data) {
@@ -729,7 +883,7 @@ function showCouplingResult(data) {
     couplingSharedList.appendChild(item);
   });
 
-  couplingResults.hidden = false;
+  reveal(couplingResults, 6, 220);
 }
 
 function showCoCitationResult(data) {
@@ -793,7 +947,7 @@ function showCoCitationResult(data) {
     couplingSharedList.appendChild(item);
   });
 
-  couplingResults.hidden = false;
+  reveal(couplingResults, 6, 220);
 }
 
 async function handleCouplingSubmit(event) {
@@ -846,7 +1000,28 @@ async function handleCouplingSubmit(event) {
   couplingButton.textContent = "Compare";
 }
 
-nodePanelClose.addEventListener("click", clearNodeSelection);
+nodePanelClose.addEventListener("click", closeNodePanel);
+nodePanel.addEventListener("keydown", function (event) {
+  if (event.key === "Escape") {
+    closeNodePanel();
+  }
+});
+if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+  var graphResizeTimer = null;
+  window.addEventListener("resize", function () {
+    if (!lastGraph) {
+      return;
+    }
+    clearTimeout(graphResizeTimer);
+    graphResizeTimer = setTimeout(function () {
+      var ring = lastGraph.citedPapers.length <= 16 ? 190 : 225;
+      var dot = lastGraph.citedPapers.length > 40 ? 6 : 8;
+      if (shouldShowGraphLabels(lastGraph.citedPapers, ring, dot) !== lastGraph.labelsShown) {
+        drawGraph(lastGraph.centerId, lastGraph.citedPapers);
+      }
+    }, 150);
+  });
+}
 searchForm.addEventListener("submit", handleSubmit);
 couplingForm.addEventListener("submit", handleCouplingSubmit);
 if (modeCouplingRadio) {
