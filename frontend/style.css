@@ -47,8 +47,7 @@ body {
 }
 
 .container {
-  width: calc(100% - 2 * clamp(16px, 3vw, 48px));
-  max-width: 1280px;
+  width: calc(100% - 2 * clamp(16px, 2vw, 36px));
   margin-inline: auto;
 }
 
@@ -105,29 +104,6 @@ main:focus {
 .brand-sub {
   color: var(--text-2);
   font-size: 0.875rem;
-}
-
-.topbar nav {
-  display: flex;
-  gap: 8px;
-}
-
-.topbar nav a {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  padding: 0 14px;
-  color: var(--text);
-  font-size: 0.9375rem;
-  font-weight: 600;
-  text-decoration: none;
-  border-bottom: 2px solid transparent;
-  transition: color var(--dur-fast) ease, border-color var(--dur-fast) ease;
-}
-
-.topbar nav a:hover {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
 }
 
 /* ---------- Sections and type ---------- */

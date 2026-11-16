@@ -65,7 +65,7 @@ Work IDs and DOIs wrap anywhere (`overflow-wrap: anywhere`) so nothing is clippe
 ## Spacing, shape, layout
 
 - Scale: 4, 8, 12, 16, 24, 32, 40, 64 px.
-- Workspace: up to 1280 px of content with fluid 16–48 px side gutters. Supporting prose uses a shorter measure.
+- Workspace: full available width with fluid 16–36 px side gutters. Supporting prose uses a shorter measure.
 - Sections are separated by 64 px (32 px margin plus 32 px padding) and a hairline.
 - Radius: 4 px for controls, 6 px for panels. No pills, no shadows.
 - Minimum interactive target: 44 px.
@@ -73,7 +73,7 @@ Work IDs and DOIs wrap anywhere (`overflow-wrap: anywhere`) so nothing is clippe
 
 ## Components
 
-- **Top bar:** app name, one-line descriptor (hidden below 600 px), two links that point at sections that always exist: *Find a paper* and *Compare papers*. A skip link precedes it.
+- **Top bar:** app name, one-line descriptor (hidden below 600 px). A skip link precedes it.
 - **Search:** a 48 px input with an attached primary button.
 - **Paper header:** serif title, then a compact metadata row (year, DOI, Work ID, reference count), then authors inline. Beyond eight authors the rest collapse behind "and N more authors".
 - **Summary:** three figures in one band separated by hairlines: Total citations, Self-citations, Reciprocal citations. A one-line note explains that SELF and RECIPROCAL are independent.
