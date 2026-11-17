@@ -11,7 +11,8 @@ c_program_lock = threading.Lock()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_BACKEND_DIR = os.path.join(BASE_DIR, "..", "backend")
 FRONTEND_DIR = os.path.join(BASE_DIR, "..", "frontend")
-EXE_PATH = os.path.join(DEFAULT_BACKEND_DIR, "citespect.exe")
+EXE_NAME = "citespect.exe" if os.name == "nt" else "citespect"
+EXE_PATH = os.path.join(DEFAULT_BACKEND_DIR, EXE_NAME)
 
 app = Flask(__name__, static_folder=FRONTEND_DIR, static_url_path="")
 
@@ -567,4 +568,5 @@ def cocitation_analysis():
 
 
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)

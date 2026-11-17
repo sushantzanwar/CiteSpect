@@ -7,16 +7,6 @@
 #include "csv_store.h"
 #include "openalex.h"
 
-/*
- * CitationSummary counts outcomes for the final report.
- * self_count        - confirmed self-citations (shared author found).
- * not_self_count    - citations not identified as self.
- * recip_conf_count  - confirmed reciprocal citations (B also cites A).
- * recip_not_count   - not reciprocal (B's refs available and A not found).
- * recip_unk_count   - reciprocal status unknown (B's refs unavailable/failed).
- * self_ref_count    - the citing paper references itself by Work ID (skipped).
- * dup_count         - duplicate cited-ID records in citations.csv (skipped).
- */
 typedef struct {
     int self_count;
     int not_self_count;
@@ -27,25 +17,6 @@ typedef struct {
     int dup_count;
 } CitationSummary;
 
-/* ------------------------------------------------------------------
- * Hash-table-based shared-author search
- * ------------------------------------------------------------------ */
-
-/*
- * find_self_authors_hash
- *
- * Looks up each non-empty author ID of *cited* in the pre-built hash
- * table of the citing paper's authors.
- *
- * Parameters:
- *   citing_ht   - hash table built from the citing paper's author IDs.
- *   cited       - the cited paper whose authors we are checking.
- *   out_ids     - caller-supplied array: receives matched author IDs.
- *   out_names   - caller-supplied array: receives matched author names.
- *   max_matches - capacity of out_ids / out_names arrays.
- *
- * Returns the number of shared authors found (0 = no match = not self).
- */
 static int find_self_authors_hash(const AuthorHash *citing_ht,
                                   const Paper *cited,
                                   char out_ids[][PAPER_ID_LEN],
@@ -61,7 +32,7 @@ static int find_self_authors_hash(const AuthorHash *citing_ht,
             continue;
         hit = hash_search(citing_ht, cited->author_ids[i]);
         if (hit != NULL) {
-            /* Avoid reporting the same shared author more than once */
+
             int already_added = 0;
             for (k = 0; k < count; k++) {
                 if (strcmp(out_ids[k], hit->author_id) == 0) {
@@ -81,10 +52,6 @@ static int find_self_authors_hash(const AuthorHash *citing_ht,
     return count;
 }
 
-/* ------------------------------------------------------------------
- * Output helpers
- * ------------------------------------------------------------------ */
-
 static void print_citation_result(const char *cited_id,
                                   int is_self,
                                   const char shared_ids[][PAPER_ID_LEN],
@@ -96,7 +63,6 @@ static void print_citation_result(const char *cited_id,
 
     printf("Cited Paper: %s\n", cited_id);
 
-    /* SELF-citation line */
     if (is_self) {
         printf("Self Citation: SELF\n");
         for (i = 0; i < shared_count; i++) {
@@ -109,7 +75,6 @@ static void print_citation_result(const char *cited_id,
         printf("Self Citation: NOT IDENTIFIED AS SELF\n");
     }
 
-    /* Reciprocal Cross-Citation line */
     if (recip_status == RECIPROCAL_CONFIRMED) {
         printf("Reciprocal Citation: CONFIRMED RECIPROCAL\n");
     } else if (recip_status == RECIPROCAL_NOT) {
@@ -121,17 +86,6 @@ static void print_citation_result(const char *cited_id,
     printf("\n---------------------------------------\n\n");
 }
 
-/* ------------------------------------------------------------------
- * Load a cited paper (from CSV cache or OpenAlex)
- * ------------------------------------------------------------------ */
-
-/*
- * fetch_missing_references
- *
- * Fetches a cached paper from OpenAlex to obtain its outgoing references
- * when they have not yet been recorded in citations.csv.
- * Returns 1 if references were retrieved and verified, 0 on failure.
- */
 static int fetch_missing_references(const char *paper_id, Paper *out)
 {
     static Paper fetched;
@@ -149,12 +103,6 @@ static int fetch_missing_references(const char *paper_id, Paper *out)
     return 1;
 }
 
-/*
- * load_cached_cited_paper
- *
- * Loads authors from authors.csv, then loads references from citations.csv
- * if available, or fetches missing references from OpenAlex once.
- */
 static int load_cached_cited_paper(const char *paper_id, Paper *out, int *refs_available)
 {
     paper_init(out, paper_id, "", 0, "");
@@ -170,13 +118,6 @@ static int load_cached_cited_paper(const char *paper_id, Paper *out, int *refs_a
     return OPENALEX_OK;
 }
 
-/*
- * load_cited_paper
- *
- * Populates *out* with authors and references.
- * Sets *refs_available to 1 if references were successfully retrieved
- * or verified, or 0 if unavailable.
- */
 static int load_cited_paper(const char *paper_id, Paper *out, int *refs_available)
 {
     int code;
@@ -190,17 +131,12 @@ static int load_cited_paper(const char *paper_id, Paper *out, int *refs_availabl
     if (code != OPENALEX_OK)
         return code;
 
-    /* Referenced works were fetched directly by openalex_fetch_by_id */
     *refs_available = 1;
 
     if (csv_save_paper(out) == CSV_ERR_FILE)
         printf("Warning: could not save %s to the CSV files.\n", paper_id);
     return OPENALEX_OK;
 }
-
-/* ------------------------------------------------------------------
- * Check reciprocal citation using CitationGraph
- * ------------------------------------------------------------------ */
 
 int citation_check_reciprocal(const Paper *cited, const char *citing_id, int refs_available)
 {
@@ -225,17 +161,6 @@ int citation_check_reciprocal(const Paper *cited, const char *citing_id, int ref
     return has_rev ? RECIPROCAL_CONFIRMED : RECIPROCAL_NOT;
 }
 
-/* ------------------------------------------------------------------
- * Per-citation analysis
- * ------------------------------------------------------------------ */
-
-/*
- * analyze_one
- *
- * Uses the pre-built AuthorHash of the citing paper to check one cited
- * paper for shared authors, and checks for reciprocal cross-citation
- * (B -> A) using CitationGraph.
- */
 static void analyze_one(const char *citing_id,
                         const AuthorHash *citing_ht,
                         const char *cited_id,
@@ -261,7 +186,6 @@ static void analyze_one(const char *citing_id,
         return;
     }
 
-    /* 1. SELF-citation detection via Hash Table */
     shared_count = find_self_authors_hash(citing_ht, &cited,
                                           shared_ids, shared_names,
                                           PAPER_MAX_AUTHORS);
@@ -271,7 +195,6 @@ static void analyze_one(const char *citing_id,
     else
         summary->not_self_count++;
 
-    /* 2. Reciprocal Cross-Citation detection via CitationGraph */
     recip_status = citation_check_reciprocal(&cited, citing_id, refs_available);
     if (recip_status == RECIPROCAL_CONFIRMED)
         summary->recip_conf_count++;
@@ -282,10 +205,6 @@ static void analyze_one(const char *citing_id,
 
     print_citation_result(cited_id, is_self, shared_ids, shared_names, shared_count, recip_status);
 }
-
-/* ------------------------------------------------------------------
- * Duplicate detection
- * ------------------------------------------------------------------ */
 
 int citation_is_duplicate(char cited_ids[][PAPER_ID_LEN], int index)
 {
@@ -300,10 +219,6 @@ int citation_is_duplicate(char cited_ids[][PAPER_ID_LEN], int index)
     }
     return 0;
 }
-
-/* ------------------------------------------------------------------
- * Loop over all cited papers using a single hash table
- * ------------------------------------------------------------------ */
 
 static void analyze_all(const char *citing_id,
                         const AuthorHash *citing_ht,
@@ -323,10 +238,6 @@ static void analyze_all(const char *citing_id,
         }
     }
 }
-
-/* ------------------------------------------------------------------
- * Summary printout
- * ------------------------------------------------------------------ */
 
 static void print_summary(const CitationSummary *summary)
 {
@@ -348,21 +259,6 @@ static void print_summary(const CitationSummary *summary)
     }
 }
 
-/* ------------------------------------------------------------------
- * Public entry point
- * ------------------------------------------------------------------ */
-
-/*
- * analyze_paper_citations
- *
- * 1. Load the citing paper's author IDs from CSV.
- * 2. Build an AuthorHash table once from those IDs.
- * 3. Load the list of cited paper IDs from citations.csv.
- * 4. For each cited paper, call analyze_one() which reuses the same
- *    hash table (no rebuild per cited paper) and checks reciprocal
- *    cross-citation via CitationGraph.
- * 5. Free the hash table, print the summary, return.
- */
 int analyze_paper_citations(const char *citing_id)
 {
     static Paper citing;
@@ -385,7 +281,6 @@ int analyze_paper_citations(const char *citing_id)
     paper_init(&citing, citing_id, "", 0, "");
     csv_load_authors(citing_id, &citing);
 
-    /* Build the hash table once from the citing paper's author IDs. */
     author_hash_init(&citing_ht);
     author_hash_build(&citing_ht, &citing);
 
@@ -402,18 +297,9 @@ int analyze_paper_citations(const char *citing_id)
     analyze_all(citing_id, &citing_ht, cited_ids, total, &summary);
     print_summary(&summary);
 
-    /* Free all hash-table nodes. */
     author_hash_free(&citing_ht);
     return 1;
 }
-
-/* ------------------------------------------------------------------
- * classify_citation — kept for API compatibility
- *
- * Still performs its original O(n*m) nested-loop comparison so that
- * any code calling this function directly continues to work unchanged.
- * The citation-analysis workflow above uses the hash table instead.
- * ------------------------------------------------------------------ */
 
 static int find_shared_authors(const Paper *citing, const Paper *cited,
                                int shared_index[])
@@ -457,10 +343,6 @@ int classify_citation(const Paper *citing, const Paper *cited,
         return CITATION_CROSS;
     return CITATION_UNKNOWN;
 }
-
-/* ------------------------------------------------------------------
- * Bibliographic Coupling (Paper A vs. Paper B reference overlap)
- * ------------------------------------------------------------------ */
 
 #define REF_HASH_BUCKETS 1009
 
@@ -686,10 +568,6 @@ int compare_papers_coupling(const char *paper_a_id, const char *paper_b_id)
     print_coupling_report(paper_a_id, paper_b_id, &res);
     return res.status != COUPLING_UNKNOWN;
 }
-
-/* ------------------------------------------------------------------
- * Co-Citation Detection (third-party papers citing both A and B)
- * ------------------------------------------------------------------ */
 
 static int normalize_work_id_str(const char *raw, char *out, size_t size)
 {
